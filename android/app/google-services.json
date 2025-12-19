@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "248358115266",
+    "project_id": "roamsg-f92ce",
+    "storage_bucket": "roamsg-f92ce.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:248358115266:android:b444b85f69756a0ee1685b",
+        "android_client_info": {
+          "package_name": "com.example.roamsg"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDL4LBanWWkrIdOdrARZkeTnR3FJLtS3Jk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
