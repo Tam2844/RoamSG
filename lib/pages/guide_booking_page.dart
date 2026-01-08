@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-class TourBookingPage extends StatefulWidget {
-  const TourBookingPage({super.key});
+class GuideBookingPage extends StatefulWidget {
+  const GuideBookingPage({super.key});
 
   @override
-  State<TourBookingPage> createState() => _TourBookingPageState();
+  State<GuideBookingPage> createState() => _GuideBookingPageState();
 }
 
-class _TourBookingPageState extends State<TourBookingPage> {
+class _GuideBookingPageState extends State<GuideBookingPage> {
   int _mode = 0; // 0 Hour | 1 Day | 2 Immediate
 
   String _district = "District 2";
@@ -60,7 +60,12 @@ class _TourBookingPageState extends State<TourBookingPage> {
               sliver: SliverList.separated(
                 itemCount: _demoGuides.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, i) => _GuideCard(g: _demoGuides[i]),
+                itemBuilder: (context, i) => _GuideCard(
+                  g: _demoGuides[i],
+                  onTap: () => _openGuideDetail(_demoGuides[i]),
+                ),
+
+
               ),
             ),
           ],
@@ -458,6 +463,24 @@ class _TourBookingPageState extends State<TourBookingPage> {
       ),
     );
   }
+  void _openGuideDetail(Guide guide) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GuideDetailPage(
+          guide: guide,
+          mode: _mode,
+          district: _district,
+          language: _language,
+          level: _level,
+          start: _start,
+          end: _end,
+          adults: _adults,
+        ),
+      ),
+    );
+  }
+
 }
 
 class _IconCircle extends StatelessWidget {
@@ -597,8 +620,6 @@ class Guide {
   final String name;
   final String langs;
   final String metaLeft;
-  final double rating;
-  final int reviews;
   final String tag1;
   final String tag2;
 
@@ -606,20 +627,17 @@ class Guide {
     required this.name,
     required this.langs,
     required this.metaLeft,
-    required this.rating,
-    required this.reviews,
     required this.tag1,
     required this.tag2,
   });
 }
+
 
 const _demoGuides = <Guide>[
   Guide(
     name: "VU KIM YEN",
     langs: "Languages: VN, EN, CN",
     metaLeft: "Experience: 10 yrs\nDistrict: 1, 2, 3, ...",
-    rating: 4.8,
-    reviews: 2599,
     tag1: "Friendly",
     tag2: "Humorous",
   ),
@@ -627,17 +645,13 @@ const _demoGuides = <Guide>[
     name: "TRAN THI VAN",
     langs: "Languages: VN, EN",
     metaLeft: "Experience: 6 yrs\nDistrict: 2, 7, ...",
-    rating: 4.7,
-    reviews: 1200,
     tag1: "Careful",
     tag2: "On-time",
   ),
   Guide(
-    name: "NGUYEN MINH TRI",
+     name: "NGUYEN MINH TRI",
     langs: "Languages: VN, EN, JP",
     metaLeft: "Experience: 8 yrs\nDistrict: 1, 5, ...",
-    rating: 4.9,
-    reviews: 840,
     tag1: "Pro",
     tag2: "Storyteller",
   ),
@@ -645,74 +659,99 @@ const _demoGuides = <Guide>[
 
 class _GuideCard extends StatelessWidget {
   final Guide g;
-  const _GuideCard({required this.g});
+  final VoidCallback? onTap;
+  const _GuideCard({required this.g, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [BoxShadow(blurRadius: 18, color: Color(0x14000000), offset: Offset(0, 8))],
-      ),
-      child: Row(
-        children: [
-          Column(
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: const [
+              BoxShadow(
+                blurRadius: 18,
+                color: Color(0x14000000),
+                offset: Offset(0, 8),
+              )
+            ],
+          ),
+          child: Row(
             children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: const Color(0xFFE9F7FF),
-                child: const Icon(Icons.person_rounded, color: Color(0xFF4C7DFF), size: 30),
+              Column(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: const Color(0xFFE9F7FF),
+                    child: const Icon(Icons.person_rounded,
+                        color: Color(0xFF4C7DFF), size: 30),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // cho nút MORE cũng bấm được
+                  InkWell(
+                    onTap: onTap,
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB7F0E8),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text("MORE",
+                          style: TextStyle(
+                              fontWeight: FontWeight.w900, fontSize: 12)),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFB7F0E8),
-                  borderRadius: BorderRadius.circular(999),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(g.name,
+                        style: const TextStyle(fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 4),
+                    Text(g.langs,
+                        style: const TextStyle(
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.5)),
+                    const SizedBox(height: 6),
+                    Text(g.metaLeft,
+                        style: const TextStyle(
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.5)),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _Tag(text: g.tag1),
+                        _Tag(text: g.tag2),
+                        const _Tag(text: "Level"),
+                      ],
+                    ),
+                  ],
                 ),
-                child: const Text("MORE", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
               ),
             ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(g.name, style: const TextStyle(fontWeight: FontWeight.w900)),
-                const SizedBox(height: 4),
-                Text(g.langs, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700, fontSize: 12.5)),
-                const SizedBox(height: 6),
-                Text(g.metaLeft, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700, fontSize: 12.5)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _StarRow(rating: g.rating),
-                    const SizedBox(width: 8),
-                    Text("${g.rating.toStringAsFixed(1)} (${g.reviews})",
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _Tag(text: g.tag1),
-                    _Tag(text: g.tag2),
-                    const _Tag(text: "Level"),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
+
 
 class _Tag extends StatelessWidget {
   final String text;
@@ -731,21 +770,301 @@ class _Tag extends StatelessWidget {
   }
 }
 
-class _StarRow extends StatelessWidget {
-  final double rating;
-  const _StarRow({required this.rating});
+class GuideDetailPage extends StatelessWidget {
+  final Guide guide;
+
+  // thông tin booking đang chọn ở TourBookingPage
+  final int mode; // 0 Hour | 1 Day | 2 Immediate
+  final String district;
+  final String language;
+  final String level;
+  final DateTime start;
+  final DateTime end;
+  final int adults;
+
+  const GuideDetailPage({
+    super.key,
+    required this.guide,
+    required this.mode,
+    required this.district,
+    required this.language,
+    required this.level,
+    required this.start,
+    required this.end,
+    required this.adults,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final full = rating.floor().clamp(0, 5);
-    final half = (rating - full) >= 0.5 ? 1 : 0;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(5, (i) {
-        if (i < full) return const Icon(Icons.star_rounded, size: 16, color: Color(0xFFFFC107));
-        if (i == full && half == 1) return const Icon(Icons.star_half_rounded, size: 16, color: Color(0xFFFFC107));
-        return const Icon(Icons.star_border_rounded, size: 16, color: Color(0xFFFFC107));
-      }),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6FAFF),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: const Color(0xFF0F172A),
+        title: const Text("Chi tiết HDV", style: TextStyle(fontWeight: FontWeight.w900)),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+        children: [
+          _Hero(guide: guide),
+          const SizedBox(height: 12),
+
+          _Card(
+            title: "Thông tin đặt",
+            child: Column(
+              children: [
+                _InfoRow(icon: Icons.place_rounded, label: "Khu vực", value: district),
+                const SizedBox(height: 8),
+                _InfoRow(icon: Icons.translate_rounded, label: "Ngôn ngữ", value: language),
+                const SizedBox(height: 8),
+                _InfoRow(icon: Icons.verified_rounded, label: "Level", value: level),
+                const SizedBox(height: 8),
+                _InfoRow(icon: Icons.group_rounded, label: "Số khách", value: "$adults người"),
+                const SizedBox(height: 8),
+                _InfoRow(icon: Icons.schedule_rounded, label: "Hình thức", value: _modeText(mode)),
+                const SizedBox(height: 8),
+                _InfoRow(
+                  icon: Icons.calendar_month_rounded,
+                  label: "Thời gian",
+                  value: "${_fmtDate(start)} ${_fmtTime(start)}  →  ${_fmtDate(end)} ${_fmtTime(end)}",
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          _Card(
+            title: "Giới thiệu",
+            child: Text(
+              // tận dụng metaLeft cho demo
+              "${guide.metaLeft}\n\n"
+              "Mình là hướng dẫn viên có kinh nghiệm, ưu tiên lịch trình gọn gàng, an toàn và vui vẻ. "
+              "Có thể tùy biến tour theo sở thích (ẩm thực. văn hoá. check-in).",
+              style: const TextStyle(height: 1.35, fontWeight: FontWeight.w700, color: Colors.black87),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          _Card(
+            title: "Thế mạnh",
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _Chip(text: guide.tag1),
+                _Chip(text: guide.tag2),
+                const _Chip(text: "Local tips"),
+                const _Chip(text: "Flexible"),
+              ],
+            ),
+          ),
+        ],
+      ),
+
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+          child: SizedBox(
+            height: 48,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4C7DFF),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () => _openBookSheet(context),
+              child: const Text("ĐẶT HƯỚNG DẪN VIÊN", style: TextStyle(fontWeight: FontWeight.w900)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===== booking bottom sheet =====
+
+  void _openBookSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("Xác nhận đặt ${guide.name}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            const SizedBox(height: 10),
+            _SheetLine("Khu vực", district),
+            _SheetLine("Ngôn ngữ", language),
+            _SheetLine("Level", level),
+            _SheetLine("Số khách", "$adults người"),
+            _SheetLine("Thời gian", "${_fmtDate(start)} ${_fmtTime(start)} → ${_fmtDate(end)} ${_fmtTime(end)}"),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF67D4FF),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Đã gửi yêu cầu đặt HDV: ${guide.name} (demo)")),
+                  );
+                },
+                child: const Text("XÁC NHẬN", style: TextStyle(fontWeight: FontWeight.w900)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===== helpers =====
+
+  static String _modeText(int m) => (m == 0) ? "Theo giờ" : (m == 1) ? "Theo ngày" : "Ngay lập tức";
+
+  static String _two(int n) => n.toString().padLeft(2, "0");
+  static String _fmtTime(DateTime d) => "${_two(d.hour)}:${_two(d.minute)}";
+  static String _fmtDate(DateTime d) => "${_two(d.day)}/${_two(d.month)}";
+}
+
+// ===== detail widgets =====
+
+class _Hero extends StatelessWidget {
+  final Guide guide;
+  const _Hero({required this.guide});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF67D4FF), Color(0xFF4C7DFF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [BoxShadow(blurRadius: 18, color: Color(0x16000000), offset: Offset(0, 10))],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.22),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Icon(Icons.person_rounded, color: Colors.white, size: 34),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(guide.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                const SizedBox(height: 6),
+                Text(guide.langs, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
+
+class _Card extends StatelessWidget {
+  final String title;
+  final Widget child;
+  const _Card({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [BoxShadow(blurRadius: 18, color: Color(0x14000000), offset: Offset(0, 8))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _InfoRow({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: const Color(0xFF4C7DFF)),
+        const SizedBox(width: 10),
+        SizedBox(width: 90, child: Text(label, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700))),
+        Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w900))),
+      ],
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  final String text;
+  const _Chip({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3FAFF),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(text, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+    );
+  }
+}
+
+class _SheetLine extends StatelessWidget {
+  final String k;
+  final String v;
+  const _SheetLine(this.k, this.v);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(width: 90, child: Text(k, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700))),
+          Expanded(child: Text(v, style: const TextStyle(fontWeight: FontWeight.w900))),
+        ],
+      ),
+    );
+  }
+}
+

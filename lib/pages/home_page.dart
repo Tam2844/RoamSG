@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'tour_booking_page.dart';
+import 'package:roamsg/pages/profile_page.dart';
+import 'package:roamsg/pages/tour_search_page.dart';
+import 'guide_booking_page.dart';
 
 
 class HomePage extends StatefulWidget {
@@ -17,17 +19,14 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF6FAFF),
-      body: SafeArea(
-        child: IndexedStack(
-          index: _tab,
-          children: [
-            _HomeTab(onLogout: _logout),
-            const _PlaceholderTab(title: "Newsfeed"),
-            const _PlaceholderTab(title: "Support"),
-            const _PlaceholderTab(title: "Chat"),
-            const _PlaceholderTab(title: "Profile"),
-          ],
-        ),
+      body: IndexedStack(
+        index: _tab,
+        children: [
+          SafeArea(child: _HomeTab(onLogout: _logout)), // Home
+          const TourSearchPage(),                      // Đặt tour
+          const GuideBookingPage(),                     // HDV (booking guide)
+          const ProfilePage(),                         // Profile
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _tab,
@@ -37,9 +36,8 @@ class _HomePageState extends State<HomePage> {
         unselectedItemColor: Colors.black54,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.newspaper_rounded), label: "Newsfeed"),
-          BottomNavigationBarItem(icon: Icon(Icons.support_agent_rounded), label: "Support"),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_rounded), label: "Chat"),
+          BottomNavigationBarItem(icon: Icon(Icons.map_rounded), label: "Tour"),
+          BottomNavigationBarItem(icon: Icon(Icons.person_pin_circle_rounded), label: "HDV"),
           BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: "Profile"),
         ],
       ),
@@ -50,6 +48,7 @@ class _HomePageState extends State<HomePage> {
     await FirebaseAuth.instance.signOut();
   }
 }
+
 
 class _HomeTab extends StatelessWidget {
   final VoidCallback onLogout;
@@ -71,12 +70,6 @@ class _HomeTab extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: _SearchBar(),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-            child: _CategoryRow(),
           ),
         ),
         SliverToBoxAdapter(
@@ -282,57 +275,6 @@ class _SearchBar extends StatelessWidget {
     );
   }
 }
-
-
-class _CategoryRow extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final items = [
-      ("Guide", Icons.person_pin_circle, () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const TourBookingPage()),
-        );
-      }),
-      ("Hotels", Icons.apartment_rounded, null),
-      ("Car Rental", Icons.directions_car_rounded, null),
-      ("Plan Your Trip", Icons.event_note_rounded, null),
-      ("More", Icons.more_horiz_rounded, null),
-    ];
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: items
-          .map((e) => _CategoryItem(title: e.$1, icon: e.$2, onTap: e.$3))
-          .toList(),
-    );
-  }
-}
-
-
-class _CategoryItem extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final VoidCallback? onTap; // thêm
-
-  const _CategoryItem({required this.title, required this.icon, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          //..
-        ],
-      ),
-    );
-  }
-}
-
-
 
 class _SectionTitle extends StatelessWidget {
   final String title;
@@ -542,14 +484,14 @@ class _DealTile extends StatelessWidget {
   }
 }
 
-class _PlaceholderTab extends StatelessWidget {
-  final String title;
-  const _PlaceholderTab({required this.title});
+// class _PlaceholderTab extends StatelessWidget {
+//   final String title;
+//   const _PlaceholderTab({required this.title});
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Center(
+//       child: Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+//     );
+//   }
+// }
