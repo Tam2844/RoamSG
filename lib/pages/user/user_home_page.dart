@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'guide_booking_page.dart';
+import 'user_guide_booking_page.dart';
 import '../profile/user_profile_page.dart';
-import 'tour_search_page.dart';
+import 'user_tour_search_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -91,18 +93,50 @@ class _HomeTab extends StatelessWidget {
         ),
         SliverToBoxAdapter(
           child: SizedBox(
-            height: 160,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-              scrollDirection: Axis.horizontal,
-              children: const [
-                _PlaceCard(title: "Independence Palace", subtitle: "District 1", icon: Icons.account_balance),
-                _PlaceCard(title: "Hoang Phap Pagoda", subtitle: "Hoc Mon", icon: Icons.temple_buddhist),
-                _PlaceCard(title: "Ben Thanh Market", subtitle: "District 1", icon: Icons.storefront),
-              ],
+            height: 180,
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('tours')
+                  .orderBy('createdAt', descending: true)
+                  .limit(10)
+                  .snapshots(),
+              builder: (context, snap) {
+                if (snap.hasError) {
+                  return _HorizontalMessage(text: "Lỗi tải tours: ${snap.error}");
+                }
+                if (!snap.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final docs = snap.data!.docs;
+                if (docs.isEmpty) {
+                  return const _HorizontalMessage(
+                    text: "Chưa có tour nào. Bấm icon 🔧 để seed dữ liệu.",
+                  );
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: docs.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, i) {
+                    final d = docs[i];
+                    final data = d.data();
+
+                    return _TourCard(
+                      title: (data['title'] ?? 'Tour').toString(),
+                      subtitle: (data['city'] ?? '').toString(),
+                      price: (data['price'] is num) ? (data['price'] as num).toInt() : 0,
+                      imageUrl: (data['imageUrl'] ?? '').toString(),
+                    );
+                  },
+                );
+              },
             ),
           ),
         ),
+
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
@@ -127,17 +161,65 @@ class _HomeTab extends StatelessWidget {
             child: _FilterChips(),
           ),
         ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
-          sliver: SliverList.separated(
-            itemCount: 6,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, i) => _DealTile(
-              title: "Hotel Deal #${i + 1}",
-              subtitle: "Up to 50% off · District ${i % 3 + 1}",
-            ),
-          ),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('tours')
+              .orderBy('createdAt', descending: true)
+              .limit(20)
+              .snapshots(),
+          builder: (context, snap) {
+            if (snap.hasError) {
+              return SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+                  child: Text("Lỗi tải tours: ${snap.error}"),
+                ),
+              );
+            }
+            if (!snap.hasData) {
+              return const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              );
+            }
+
+            final docs = snap.data!.docs;
+            if (docs.isEmpty) {
+              return const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 18),
+                  child: Text("Chưa có tour nào để hiển thị."),
+                ),
+              );
+            }
+
+            return SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+              sliver: SliverList.separated(
+                itemCount: docs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, i) {
+                  final data = docs[i].data();
+
+                  final title = (data['title'] ?? 'Tour').toString();
+                  final city = (data['city'] ?? '').toString();
+                  final price =
+                      (data['price'] is num) ? (data['price'] as num).toInt() : 0;
+                  final duration =
+                      (data['durationHours'] is num) ? (data['durationHours'] as num).toInt() : 0;
+
+                  return _TourDealTile(
+                    title: title,
+                    subtitle: "$city · ${duration}h · ${_money(price)}",
+                  );
+                },
+              ),
+            );
+          },
         ),
+
       ],
     );
   }
@@ -464,6 +546,166 @@ class _DealTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(Icons.local_offer_rounded, color: Color(0xFF6C63FF)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+                const SizedBox(height: 6),
+                Text(subtitle, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right, color: Colors.black38),
+        ],
+      ),
+    );
+  }
+}
+String _money(int vnd) {
+  final s = vnd.toString();
+  final buf = StringBuffer();
+  for (int i = 0; i < s.length; i++) {
+    final left = s.length - i;
+    buf.write(s[i]);
+    if (left > 1 && left % 3 == 1) buf.write('.');
+  }
+  return "${buf.toString()}đ";
+}
+
+class _HorizontalMessage extends StatelessWidget {
+  final String text;
+  const _HorizontalMessage({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+}
+
+class _TourCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final int price;
+  final String imageUrl;
+
+  const _TourCard({
+    required this.title,
+    required this.subtitle,
+    required this.price,
+    required this.imageUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 260,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(blurRadius: 14, color: Color(0x14000000), offset: Offset(0, 6)),
+        ],
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              width: 88,
+              height: 88,
+              child: imageUrl.isEmpty
+                  ? Container(
+                      color: const Color(0xFFE9F7FF),
+                      child: const Icon(Icons.image, color: Color(0xFF4C7DFF)),
+                    )
+                  : Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: const Color(0xFFE9F7FF),
+                        child: const Icon(Icons.broken_image, color: Color(0xFF4C7DFF)),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE9F7FF),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    _money(price),
+                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF4C7DFF)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TourDealTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _TourDealTile({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(blurRadius: 14, color: Color(0x14000000), offset: Offset(0, 6)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE9F7FF),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.tour_rounded, color: Color(0xFF6C63FF)),
           ),
           const SizedBox(width: 12),
           Expanded(

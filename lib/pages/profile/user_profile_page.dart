@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../guide/guide_register_page.dart';
 import 'package:flutter/material.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -162,10 +163,24 @@ class _ProfilePageState extends State<ProfilePage> {
                 icon: Icons.workspace_premium_rounded,
                 title: isGuide ? "Guide profile" : "Become a guide",
                 subtitle: isGuide ? "Manage your guide settings" : "Apply to be a guide",
-                onTap: () {
-                  setState(() => isGuide = !isGuide);
-                  _toast(isGuide ? "Đã bật chế độ Guide (demo)" : "Đã về Customer (demo)");
+                onTap: () async {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user == null) {
+                    _toast("Bạn chưa đăng nhập");
+                    return;
+                  }
+
+                  final changed = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(builder: (_) => const GuideRegisterPage()),
+                  );
+
+                  // nếu submit xong (Navigator.pop true) thì refresh lại isGuide từ Firestore stream (page đang listen sẵn)
+                  if (changed == true) {
+                    _toast("Đã cập nhật hồ sơ HDV");
+                  }
                 },
+
               ),
               _MenuItemData(
                 icon: Icons.settings_rounded,
