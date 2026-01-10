@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'register_page.dart';
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -43,25 +45,7 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _registerQuick() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _loading = true);
-    try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailCtrl.text.trim(),
-        password: _passCtrl.text,
-      );
-      // AuthGate sẽ tự chuyển sang HomePage.
-    } on FirebaseAuthException catch (e) {
-      final msg = _friendlyAuthError(e);
-      if (mounted) _showSnack(msg);
-    } catch (_) {
-      if (mounted) _showSnack("Có lỗi xảy ra. Thử lại nhé.");
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
+  
 
   Future<void> _resetPassword() async {
     final email = _emailCtrl.text.trim();
@@ -187,9 +171,17 @@ class _LoginPageState extends State<LoginPage> {
                             children: [
                               Expanded(
                                 child: OutlinedButton(
-                                  onPressed: _loading ? null : _registerQuick,
+                                  onPressed: _loading
+                                      ? null
+                                      : () async {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(builder: (_) => const RegisterPage()),
+                                          );
+                                        },
                                   child: const Text("Tạo tài khoản"),
                                 ),
+
                               ),
                               const SizedBox(width: 10),
                               Expanded(

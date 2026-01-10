@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -5,16 +9,78 @@ class ProfilePage extends StatefulWidget {
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
+  
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  // Demo data — sau này chủ nhân lấy từ FirebaseAuth/Firestore
-  String fullName = "tamphan0579";
-  String email = "tamphan0579@gmail.com";
-  String phone = "09xxxxxxxx";
-  String cccd = "0xxxxxxxxxxxx";
-  String address = "District 3, HCM city";
+  String fullName = "";
+  String email = "";
+  String phone = "";
+  String cccd = "";
+  String address = "";
   bool isGuide = false;
+
+  bool _loading = true;
+  bool _saving = false;
+
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _bindUser();
+  }
+
+  void _bindUser() {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      // Nếu chưa login thì để trống (hoặc điều hướng về login tùy flow app)
+      setState(() {
+        _loading = false;
+        fullName = "Guest";
+        email = "";
+        phone = "";
+        cccd = "";
+        address = "";
+        isGuide = false;
+      });
+      return;
+    }
+
+    // lấy từ FirebaseAuth
+    setState(() {
+      email = user.email ?? "";
+      fullName = user.displayName ?? "";
+    });
+
+    // lắng nghe Firestore users/{uid}
+    _userSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .snapshots()
+        .listen((doc) {
+      final data = doc.data() ?? {};
+
+      setState(() {
+        fullName = (data['fullName'] ?? fullName).toString();
+        phone = (data['phone'] ?? '').toString();
+        cccd = (data['cccd'] ?? '').toString();
+        address = (data['address'] ?? '').toString();
+        isGuide = (data['isGuide'] ?? false) == true;
+        _loading = false;
+      });
+    }, onError: (_) {
+      setState(() => _loading = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _userSub?.cancel();
+    super.dispose();
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -27,27 +93,42 @@ class _ProfilePageState extends State<ProfilePage> {
         title: const Text("Profile", style: TextStyle(fontWeight: FontWeight.w900)),
         centerTitle: false,
       ),
-      body: ListView(
+      body: _loading
+        ? const Center(child: CircularProgressIndicator())
+        : ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         children: [
           _HeaderCard(
             name: fullName,
             email: email,
             badge: isGuide ? "Guide" : "Customer",
-            onEdit: _openEditProfile,
+            onEdit: _saving ? () {} : _openEditProfile,
           ),
           const SizedBox(height: 14),
 
           _InfoCard(
             title: "Personal info",
             children: [
-              _InfoRow(icon: Icons.phone_rounded, label: "Phone", value: phone),
+              _InfoRow(
+                icon: Icons.phone_rounded,
+                label: "Phone",
+                value: phone.isEmpty ? "Chưa cập nhật" : phone,
+              ),
               const Divider(height: 18),
-              _InfoRow(icon: Icons.badge_rounded, label: "CCCD", value: cccd),
+              _InfoRow(
+                icon: Icons.badge_rounded,
+                label: "CCCD",
+                value: cccd.isEmpty ? "Chưa cập nhật" : cccd,
+              ),
               const Divider(height: 18),
-              _InfoRow(icon: Icons.location_on_rounded, label: "Address", value: address),
+              _InfoRow(
+                icon: Icons.location_on_rounded,
+                label: "Address",
+                value: address.isEmpty ? "Chưa cập nhật" : address,
+              ),
             ],
           ),
+
 
           const SizedBox(height: 14),
 
@@ -106,7 +187,42 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // ===== Actions =====
+bool saving = false;
+
+Future<void> _saveProfileToFirestore(_EditResult result) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  setState(() => _saving = true);
+
+  try {
+    final uid = user.uid;
+
+    await FirebaseFirestore.instance.collection('users').doc(uid).set({
+      "fullName": result.fullName,
+      "phone": result.phone,
+      "cccd": result.cccd,
+      "address": result.address,
+      "email": user.email ?? "",
+      "updatedAt": FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    // cập nhật displayName để header đổi luôn (optional nhưng nên có)
+    if ((user.displayName ?? "") != result.fullName) {
+      await user.updateDisplayName(result.fullName);
+      await user.reload();
+    }
+
+    if (!mounted) return;
+    _toast("Saved to Firestore!");
+  } catch (e) {
+    if (!mounted) return;
+    _toast("Save failed: $e");
+  } finally {
+    if (mounted) setState(() => _saving = false);
+  }
+}
+
 
   void _toast(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -132,13 +248,15 @@ class _ProfilePageState extends State<ProfilePage> {
     if (result == null) return;
 
     setState(() {
-      fullName = result.fullName;
-      phone = result.phone;
-      cccd = result.cccd;
-      address = result.address;
-    });
+    fullName = result.fullName;
+    phone = result.phone;
+    cccd = result.cccd;
+    address = result.address;
+  });
 
-    _toast("Updated!");
+  // ✅ lưu lên Firestore
+  await _saveProfileToFirestore(result);
+
   }
 
   Future<void> _confirmLogout() async {
@@ -163,6 +281,7 @@ class _ProfilePageState extends State<ProfilePage> {
     // TODO: FirebaseAuth.instance.signOut();
     _toast("Logged out (demo)");
   }
+  
 }
 
 // ===== UI Components =====
@@ -381,6 +500,7 @@ class _EditProfileSheet extends StatefulWidget {
   State<_EditProfileSheet> createState() => _EditProfileSheetState();
 }
 
+
 class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _name;
   late final TextEditingController _phone;
@@ -426,7 +546,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
           SizedBox(
             width: double.infinity,
             height: 46,
-            child: ElevatedButton(
+            child: ElevatedButton(  
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF4C7DFF),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

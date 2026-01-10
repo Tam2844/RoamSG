@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-
-import 'auth_gate.dart'; // hoặc import đúng đường dẫn AuthGate của chủ nhân
+import 'services/auth_gate.dart';
+ // hoặc import đúng đường dẫn AuthGate của chủ nhân
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
