@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'guide_booking_page.dart';
-import '../profile/profile_page.dart';
+import '../profile/user_profile_page.dart';
 import 'tour_search_page.dart';
 
 class HomePage extends StatefulWidget {
