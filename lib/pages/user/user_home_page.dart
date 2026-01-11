@@ -4,7 +4,7 @@ import 'user_guide_booking_page.dart';
 import '../profile/user_profile_page.dart';
 import 'user_tour_search_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import '../guide/guide_home_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,18 +15,60 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _tab = 0;
+  bool _guideMode = false;
 
   @override
   Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: userRef.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text("Lỗi: ${snapshot.error}")));
+        }
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final data = snapshot.data!.data() ?? {};
+        final isGuide = data['isGuide'] == true;
+        final showGuideUI = isGuide && _guideMode;
+        final page = showGuideUI ? const GuideHomePage() : _buildUser();
+
+        return Stack(
+          children: [
+            page,
+
+            if (isGuide)
+              Positioned(
+                right: 16,
+                bottom: 16,
+                child: FloatingActionButton.extended(
+                  onPressed: () => setState(() => _guideMode = !_guideMode),
+                  icon: Icon(showGuideUI ? Icons.person : Icons.badge),
+                  label: Text(showGuideUI ? "User mode" : "Guide mode"),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildUser() {
     return Scaffold(
       backgroundColor: const Color(0xFFF6FAFF),
       body: IndexedStack(
         index: _tab,
         children: [
           SafeArea(child: _HomeTab(onLogout: _logout)), // Home
-          const TourSearchPage(),                      // Đặt tour
-          const GuideBookingPage(),                     // HDV (booking guide)
-          const ProfilePage(),                         // Profile
+          const TourSearchPage(), // Đặt tour
+          const GuideBookingPage(), // HDV (booking guide)
+          const ProfilePage(), // Profile
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -36,10 +78,19 @@ class _HomePageState extends State<HomePage> {
         selectedItemColor: const Color(0xFF6C63FF),
         unselectedItemColor: Colors.black54,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: "Home"),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_rounded),
+            label: "Home",
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.map_rounded), label: "Tour"),
-          BottomNavigationBarItem(icon: Icon(Icons.person_pin_circle_rounded), label: "HDV"),
-          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: "Profile"),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_pin_circle_rounded),
+            label: "HDV",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_rounded),
+            label: "Profile",
+          ),
         ],
       ),
     );
@@ -49,7 +100,6 @@ class _HomePageState extends State<HomePage> {
     await FirebaseAuth.instance.signOut();
   }
 }
-
 
 class _HomeTab extends StatelessWidget {
   final VoidCallback onLogout;
@@ -102,7 +152,9 @@ class _HomeTab extends StatelessWidget {
                   .snapshots(),
               builder: (context, snap) {
                 if (snap.hasError) {
-                  return _HorizontalMessage(text: "Lỗi tải tours: ${snap.error}");
+                  return _HorizontalMessage(
+                    text: "Lỗi tải tours: ${snap.error}",
+                  );
                 }
                 if (!snap.hasData) {
                   return const Center(child: CircularProgressIndicator());
@@ -127,7 +179,9 @@ class _HomeTab extends StatelessWidget {
                     return _TourCard(
                       title: (data['title'] ?? 'Tour').toString(),
                       subtitle: (data['city'] ?? '').toString(),
-                      price: (data['price'] is num) ? (data['price'] as num).toInt() : 0,
+                      price: (data['price'] is num)
+                          ? (data['price'] as num).toInt()
+                          : 0,
                       imageUrl: (data['imageUrl'] ?? '').toString(),
                     );
                   },
@@ -142,14 +196,20 @@ class _HomeTab extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFB7F0E8),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: const Text(
                   "HOT DEALS",
-                  style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.6),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
                 ),
               ),
             ),
@@ -205,10 +265,12 @@ class _HomeTab extends StatelessWidget {
 
                   final title = (data['title'] ?? 'Tour').toString();
                   final city = (data['city'] ?? '').toString();
-                  final price =
-                      (data['price'] is num) ? (data['price'] as num).toInt() : 0;
-                  final duration =
-                      (data['durationHours'] is num) ? (data['durationHours'] as num).toInt() : 0;
+                  final price = (data['price'] is num)
+                      ? (data['price'] as num).toInt()
+                      : 0;
+                  final duration = (data['durationHours'] is num)
+                      ? (data['durationHours'] as num).toInt()
+                      : 0;
 
                   return _TourDealTile(
                     title: title,
@@ -219,7 +281,6 @@ class _HomeTab extends StatelessWidget {
             );
           },
         ),
-
       ],
     );
   }
@@ -229,10 +290,7 @@ class _TopHeader extends StatelessWidget {
   final String userName;
   final VoidCallback onLogout;
 
-  const _TopHeader({
-    required this.userName,
-    required this.onLogout,
-  });
+  const _TopHeader({required this.userName, required this.onLogout});
 
   @override
   Widget build(BuildContext context) {
@@ -252,23 +310,43 @@ class _TopHeader extends StatelessWidget {
             children: [
               const Text(
                 "RoamSG",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
               ),
               const Spacer(),
-              const Icon(Icons.location_on_outlined, color: Colors.white, size: 18),
+              const Icon(
+                Icons.location_on_outlined,
+                color: Colors.white,
+                size: 18,
+              ),
               const SizedBox(width: 6),
               const Text(
                 "District 3, HCM city",
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.22),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Text("Eng", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                child: const Text(
+                  "Eng",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ],
           ),
@@ -287,12 +365,19 @@ class _TopHeader extends StatelessWidget {
                   children: [
                     Text(
                       userName,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       "Welcome back!",
-                      style: TextStyle(color: Colors.white.withOpacity(0.85), fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -322,7 +407,11 @@ class _SearchBar extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               boxShadow: const [
-                BoxShadow(blurRadius: 18, color: Color(0x14000000), offset: Offset(0, 8)),
+                BoxShadow(
+                  blurRadius: 18,
+                  color: Color(0x14000000),
+                  offset: Offset(0, 8),
+                ),
               ],
             ),
             child: Row(
@@ -332,7 +421,10 @@ class _SearchBar extends StatelessWidget {
                 Expanded(
                   child: Text(
                     "Search place, hotel, guide...",
-                    style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -347,7 +439,11 @@ class _SearchBar extends StatelessWidget {
             color: const Color(0xFFE9F7FF),
             borderRadius: BorderRadius.circular(16),
             boxShadow: const [
-              BoxShadow(blurRadius: 18, color: Color(0x14000000), offset: Offset(0, 8)),
+              BoxShadow(
+                blurRadius: 18,
+                color: Color(0x14000000),
+                offset: Offset(0, 8),
+              ),
             ],
           ),
           child: const Icon(Icons.tune, color: Color(0xFF4C7DFF)),
@@ -366,9 +462,18 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+        ),
         const Spacer(),
-        Text(actionText, style: const TextStyle(color: Color(0xFF4C7DFF), fontWeight: FontWeight.w800)),
+        Text(
+          actionText,
+          style: const TextStyle(
+            color: Color(0xFF4C7DFF),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         const SizedBox(width: 6),
         const Icon(Icons.chevron_right, color: Color(0xFF4C7DFF)),
       ],
@@ -400,7 +505,13 @@ class _PromoCardBig extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [BoxShadow(blurRadius: 14, color: Color(0x14000000), offset: Offset(0, 6))],
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 14,
+            color: Color(0x14000000),
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
         children: const [
@@ -428,7 +539,13 @@ class _PromoCardSmall extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFE9F7FF),
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [BoxShadow(blurRadius: 14, color: Color(0x14000000), offset: Offset(0, 6))],
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 14,
+            color: Color(0x14000000),
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -438,7 +555,10 @@ class _PromoCardSmall extends StatelessWidget {
           Expanded(
             child: Align(
               alignment: Alignment.bottomLeft,
-              child: Text("Up to\n30% off", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+              child: Text(
+                "Up to\n30% off",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
             ),
           ),
         ],
@@ -451,7 +571,11 @@ class _PlaceCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
-  const _PlaceCard({required this.title, required this.subtitle, required this.icon});
+  const _PlaceCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -462,7 +586,13 @@ class _PlaceCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [BoxShadow(blurRadius: 14, color: Color(0x14000000), offset: Offset(0, 6))],
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 14,
+            color: Color(0x14000000),
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -481,9 +611,20 @@ class _PlaceCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)),
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
                 const SizedBox(height: 6),
-                Text(subtitle, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700)),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
           ),
@@ -496,7 +637,13 @@ class _PlaceCard extends StatelessWidget {
 class _FilterChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final chips = const ["All", "District 1", "District 2", "District 3", "Hoc Mon"];
+    final chips = const [
+      "All",
+      "District 1",
+      "District 2",
+      "District 3",
+      "Hoc Mon",
+    ];
 
     return SizedBox(
       height: 38,
@@ -511,9 +658,18 @@ class _FilterChips extends StatelessWidget {
             decoration: BoxDecoration(
               color: selected ? const Color(0xFFB7F0E8) : Colors.white,
               borderRadius: BorderRadius.circular(999),
-              boxShadow: const [BoxShadow(blurRadius: 14, color: Color(0x14000000), offset: Offset(0, 6))],
+              boxShadow: const [
+                BoxShadow(
+                  blurRadius: 14,
+                  color: Color(0x14000000),
+                  offset: Offset(0, 6),
+                ),
+              ],
             ),
-            child: Text(chips[i], style: const TextStyle(fontWeight: FontWeight.w800)),
+            child: Text(
+              chips[i],
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
           );
         },
       ),
@@ -534,7 +690,13 @@ class _DealTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [BoxShadow(blurRadius: 14, color: Color(0x14000000), offset: Offset(0, 6))],
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 14,
+            color: Color(0x14000000),
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -545,16 +707,28 @@ class _DealTile extends StatelessWidget {
               color: const Color(0xFFE9F7FF),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(Icons.local_offer_rounded, color: Color(0xFF6C63FF)),
+            child: const Icon(
+              Icons.local_offer_rounded,
+              color: Color(0xFF6C63FF),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
                 const SizedBox(height: 6),
-                Text(subtitle, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700)),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
           ),
@@ -564,6 +738,7 @@ class _DealTile extends StatelessWidget {
     );
   }
 }
+
 String _money(int vnd) {
   final s = vnd.toString();
   final buf = StringBuffer();
@@ -587,7 +762,10 @@ class _HorizontalMessage extends StatelessWidget {
         child: Text(
           text,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            color: Colors.black54,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -616,7 +794,11 @@ class _TourCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
-          BoxShadow(blurRadius: 14, color: Color(0x14000000), offset: Offset(0, 6)),
+          BoxShadow(
+            blurRadius: 14,
+            color: Color(0x14000000),
+            offset: Offset(0, 6),
+          ),
         ],
       ),
       child: Row(
@@ -636,7 +818,10 @@ class _TourCard extends StatelessWidget {
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: const Color(0xFFE9F7FF),
-                        child: const Icon(Icons.broken_image, color: Color(0xFF4C7DFF)),
+                        child: const Icon(
+                          Icons.broken_image,
+                          color: Color(0xFF4C7DFF),
+                        ),
                       ),
                     ),
             ),
@@ -656,18 +841,27 @@ class _TourCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   subtitle,
-                  style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFE9F7FF),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     _money(price),
-                    style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF4C7DFF)),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF4C7DFF),
+                    ),
                   ),
                 ),
               ],
@@ -693,7 +887,11 @@ class _TourDealTile extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
-          BoxShadow(blurRadius: 14, color: Color(0x14000000), offset: Offset(0, 6)),
+          BoxShadow(
+            blurRadius: 14,
+            color: Color(0x14000000),
+            offset: Offset(0, 6),
+          ),
         ],
       ),
       child: Row(
@@ -712,9 +910,18 @@ class _TourDealTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
                 const SizedBox(height: 6),
-                Text(subtitle, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700)),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
           ),
