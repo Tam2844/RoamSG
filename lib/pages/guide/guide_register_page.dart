@@ -2,6 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+/// ====== Colors lấy từ RegisterPage ======
+const Color kBg = Color(0xFFF5F8FA);
+const Color kPrimary = Color(0xFF79D5FF);
+
 class GuideRegisterPage extends StatefulWidget {
   const GuideRegisterPage({super.key});
 
@@ -62,12 +66,21 @@ class _GuideRegisterPageState extends State<GuideRegisterPage> {
   }
 
   void _toast(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg)),
     );
   }
 
   int _parseIntSafe(String s) => int.tryParse(s.trim()) ?? 0;
+
+  InputDecoration _dec(String label) {
+    return const InputDecoration(
+      border: OutlineInputBorder(),
+      filled: true,
+      fillColor: Colors.white,
+    ).copyWith(labelText: label);
+  }
 
   Future<void> _prefill() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -90,6 +103,8 @@ class _GuideRegisterPageState extends State<GuideRegisterPage> {
       final guideDoc =
           await FirebaseFirestore.instance.collection('guides').doc(uid).get();
       final guideData = guideDoc.data() ?? {};
+
+      if (!mounted) return;
 
       setState(() {
         _fullName = (userData['fullName'] ?? user.displayName ?? "").toString();
@@ -126,7 +141,7 @@ class _GuideRegisterPageState extends State<GuideRegisterPage> {
     if (_saving) return;
 
     // validate form + chip fields
-    if (!_formKey.currentState!.validate()) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -182,7 +197,7 @@ class _GuideRegisterPageState extends State<GuideRegisterPage> {
 
       if (!mounted) return;
       _toast("Đăng ký hướng dẫn viên thành công!");
-      Navigator.pop(context, true); // trả về Profile (AuthGate sẽ tự đổi UI)
+      Navigator.pop(context, true);
     } catch (e) {
       if (mounted) _toast("Submit failed: $e");
     } finally {
@@ -193,118 +208,184 @@ class _GuideRegisterPageState extends State<GuideRegisterPage> {
   @override
   Widget build(BuildContext context) {
     final title = _guideDocExists ? "Cập nhật hồ sơ HDV" : "Become a guide";
+    final subTitle = _guideDocExists
+        ? "Update your guide profile"
+        : "Create your guide profile";
 
     return Scaffold(
+      backgroundColor: kBg,
+
+      // AppBar style giống RegisterPage
       appBar: AppBar(
-        title: Text(title),
+        backgroundColor: kPrimary,
+        toolbarHeight: 90,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'RoamSG',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subTitle,
+              style: const TextStyle(fontSize: 14, color: Colors.white),
+            ),
+          ],
+        ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _HeaderCard(
-                  fullName: _fullName,
-                  email: _email,
-                  phone: _phone,
-                  note: _guideDocExists
-                      ? "Bạn đang cập nhật thông tin hướng dẫn viên."
-                      : "Điền thông tin để đăng ký làm hướng dẫn viên.",
+
+      body: SafeArea(
+        child: _loading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: kPrimary,
                 ),
-                const SizedBox(height: 12),
+              )
+            : SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  16 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: Card(
+                      color: Colors.white,
+                      elevation: 2,
+                      clipBehavior: Clip.antiAlias,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // header info (đổi sang style mềm giống Register)
+                              _HeaderCard(
+                                fullName: _fullName,
+                                email: _email,
+                                phone: _phone,
+                                note: _guideDocExists
+                                    ? "Bạn đang cập nhật thông tin hướng dẫn viên."
+                                    : "Điền thông tin để đăng ký làm hướng dẫn viên.",
+                              ),
+                              const SizedBox(height: 12),
 
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        controller: _bioCtrl,
-                        maxLines: 4,
-                        decoration: const InputDecoration(
-                          labelText: "Giới thiệu (bio)",
-                          border: OutlineInputBorder(),
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              TextFormField(
+                                controller: _bioCtrl,
+                                maxLines: 4,
+                                decoration: _dec("Giới thiệu (bio)"),
+                                validator: (v) {
+                                  final s = (v ?? "").trim();
+                                  if (s.length < 20) return "Bio tối thiểu 20 ký tự";
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 12),
+
+                              MultiSelectChipsFormField(
+                                labelText: "Ngôn ngữ",
+                                options: kLangOptions
+                                    .map((e) => ChipOption(
+                                          value: e["code"]!,
+                                          label: e["label"]!,
+                                        ))
+                                    .toList(),
+                                initialValue: _selectedLangs,
+                                onChanged: (v) => setState(() => _selectedLangs = v),
+                                validator: (v) => (v == null || v.isEmpty)
+                                    ? "Chọn ít nhất 1 ngôn ngữ"
+                                    : null,
+                              ),
+                              const SizedBox(height: 12),
+
+                              MultiSelectChipsFormField(
+                                labelText: "Khu vực hoạt động",
+                                options: kAreaOptions
+                                    .map((e) => ChipOption(value: e, label: e))
+                                    .toList(),
+                                initialValue: _selectedAreas,
+                                onChanged: (v) => setState(() => _selectedAreas = v),
+                                validator: (v) => (v == null || v.isEmpty)
+                                    ? "Chọn ít nhất 1 khu vực"
+                                    : null,
+                              ),
+                              const SizedBox(height: 12),
+
+                              TextFormField(
+                                controller: _priceCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: _dec("Giá theo giờ (VND)"),
+                                validator: (v) {
+                                  final n = _parseIntSafe(v ?? "");
+                                  if (n <= 0) return "Giá phải > 0";
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 12),
+
+                              TextFormField(
+                                controller: _expCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: _dec("Số năm kinh nghiệm"),
+                                validator: (v) {
+                                  final n = _parseIntSafe(v ?? "");
+                                  if (n < 0) return "Không hợp lệ";
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+
+                              SizedBox(
+                                height: 48,
+                                child: ElevatedButton(
+                                  onPressed: _saving ? null : _submit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: kPrimary,
+                                    foregroundColor: Colors.white,
+                                    elevation: 2,
+                                  ),
+                                  child: _saving
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text(
+                                          "Submit",
+                                          style: TextStyle(fontWeight: FontWeight.bold),
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        validator: (v) {
-                          final s = (v ?? "").trim();
-                          if (s.length < 20) return "Bio tối thiểu 20 ký tự";
-                          return null;
-                        },
                       ),
-                      const SizedBox(height: 12),
-
-                      MultiSelectChipsFormField(
-                        labelText: "Ngôn ngữ",
-                        options: kLangOptions
-                            .map((e) => ChipOption(
-                                  value: e["code"]!,
-                                  label: e["label"]!,
-                                ))
-                            .toList(),
-                        initialValue: _selectedLangs,
-                        onChanged: (v) => setState(() => _selectedLangs = v),
-                        validator: (v) => (v == null || v.isEmpty)
-                            ? "Chọn ít nhất 1 ngôn ngữ"
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-
-                      MultiSelectChipsFormField(
-                        labelText: "Khu vực hoạt động",
-                        options: kAreaOptions
-                            .map((e) => ChipOption(value: e, label: e))
-                            .toList(),
-                        initialValue: _selectedAreas,
-                        onChanged: (v) => setState(() => _selectedAreas = v),
-                        validator: (v) => (v == null || v.isEmpty)
-                            ? "Chọn ít nhất 1 khu vực"
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-
-                      TextFormField(
-                        controller: _priceCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: "Giá theo giờ (VND)",
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (v) {
-                          final n = _parseIntSafe(v ?? "");
-                          if (n <= 0) return "Giá phải > 0";
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-
-                      TextFormField(
-                        controller: _expCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: "Số năm kinh nghiệm",
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (v) {
-                          final n = _parseIntSafe(v ?? "");
-                          if (n < 0) return "Không hợp lệ";
-                          return null;
-                        },
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: _saving ? null : _submit,
-                          child: Text(_saving ? "Đang lưu..." : "Submit"),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+      ),
     );
   }
 }
@@ -327,15 +408,9 @@ class _HeaderCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 18,
-            color: Color(0x14000000),
-            offset: Offset(0, 8),
-          )
-        ],
+        color: kBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE6E6E6), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,8 +422,10 @@ class _HeaderCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(email, style: const TextStyle(color: Colors.black54)),
           const SizedBox(height: 2),
-          Text(phone.isEmpty ? "No phone" : phone,
-              style: const TextStyle(color: Colors.black54)),
+          Text(
+            phone.isEmpty ? "No phone" : phone,
+            style: const TextStyle(color: Colors.black54),
+          ),
           const SizedBox(height: 10),
           Text(note),
         ],
@@ -399,10 +476,13 @@ class MultiSelectChipsFormField extends FormField<List<String>> {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
+
+                // hộp giống input (fill trắng)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: state.hasError ? Colors.red : Colors.black26,
@@ -413,14 +493,33 @@ class MultiSelectChipsFormField extends FormField<List<String>> {
                     runSpacing: 8,
                     children: options.map((opt) {
                       final isOn = selected.contains(opt.value);
+
+                      // tránh withOpacity nếu cậu đang gặp warning:
+                      final selectedColor = Color.fromARGB(255, 121, 213, 255);
+                      final softSelected = const Color.fromARGB(45, 121, 213, 255);
+
                       return FilterChip(
-                        label: Text(opt.label),
+                        label: Text(
+                          opt.label,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: isOn ? Colors.white : Colors.black87,
+                          ),
+                        ),
                         selected: isOn,
                         onSelected: (_) => toggle(opt.value),
+                        backgroundColor: Colors.white,
+                        selectedColor: isOn ? selectedColor : softSelected,
+                        checkmarkColor: Colors.white,
+                        side: BorderSide(
+                          color: isOn ? selectedColor : const Color(0xFFE6E6E6),
+                          width: 1,
+                        ),
                       );
                     }).toList(),
                   ),
                 ),
+
                 if (state.hasError) ...[
                   const SizedBox(height: 6),
                   Text(

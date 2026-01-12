@@ -5,12 +5,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../guide/guide_register_page.dart';
 import 'package:flutter/material.dart';
 
+
+const Color kBg = Color(0xFFF5F8FA);
+const Color kPrimary = Color(0xFF79D5FF);
+
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
-  
 }
 
 class _ProfilePageState extends State<ProfilePage> {
@@ -36,7 +39,6 @@ class _ProfilePageState extends State<ProfilePage> {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      // Nếu chưa login thì để trống (hoặc điều hướng về login tùy flow app)
       setState(() {
         _loading = false;
         fullName = "Guest";
@@ -49,13 +51,11 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
-    // lấy từ FirebaseAuth
     setState(() {
       email = user.email ?? "";
       fullName = user.displayName ?? "";
     });
 
-    // lắng nghe Firestore users/{uid}
     _userSub = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -82,165 +82,166 @@ class _ProfilePageState extends State<ProfilePage> {
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6FAFF),
+      backgroundColor: kBg,
       appBar: AppBar(
+        backgroundColor: kPrimary,
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: const Color(0xFF0F172A),
-        title: const Text("Profile", style: TextStyle(fontWeight: FontWeight.w900)),
-        centerTitle: false,
+        toolbarHeight: 90,
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'RoamSG',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 6),
+            Text(
+              'Your profile',
+              style: TextStyle(fontSize: 14, color: Colors.white),
+            ),
+          ],
+        ),
       ),
       body: _loading
-        ? const Center(child: CircularProgressIndicator())
-        : ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        children: [
-          _HeaderCard(
-            name: fullName,
-            email: email,
-            badge: isGuide ? "Guide" : "Customer",
-            onEdit: _saving ? () {} : _openEditProfile,
-          ),
-          const SizedBox(height: 14),
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              children: [
+                _HeaderCard(
+                  name: fullName,
+                  email: email,
+                  badge: isGuide ? "Guide" : "Customer",
+                  onEdit: _saving ? () {} : _openEditProfile,
+                ),
+                const SizedBox(height: 14),
 
-          _InfoCard(
-            title: "Personal info",
-            children: [
-              _InfoRow(
-                icon: Icons.phone_rounded,
-                label: "Phone",
-                value: phone.isEmpty ? "Chưa cập nhật" : phone,
-              ),
-              const Divider(height: 18),
-              _InfoRow(
-                icon: Icons.badge_rounded,
-                label: "CCCD",
-                value: cccd.isEmpty ? "Chưa cập nhật" : cccd,
-              ),
-              const Divider(height: 18),
-              _InfoRow(
-                icon: Icons.location_on_rounded,
-                label: "Address",
-                value: address.isEmpty ? "Chưa cập nhật" : address,
-              ),
-            ],
-          ),
+                _InfoCard(
+                  title: "Personal info",
+                  children: [
+                    _InfoRow(
+                      icon: Icons.phone_rounded,
+                      label: "Phone",
+                      value: phone.isEmpty ? "Chưa cập nhật" : phone,
+                    ),
+                    const Divider(height: 18),
+                    _InfoRow(
+                      icon: Icons.badge_rounded,
+                      label: "CCCD",
+                      value: cccd.isEmpty ? "Chưa cập nhật" : cccd,
+                    ),
+                    const Divider(height: 18),
+                    _InfoRow(
+                      icon: Icons.location_on_rounded,
+                      label: "Address",
+                      value: address.isEmpty ? "Chưa cập nhật" : address,
+                    ),
+                  ],
+                ),
 
+                const SizedBox(height: 14),
 
-          const SizedBox(height: 14),
+                _MenuCard(
+                  title: "Your stuff",
+                  items: [
+                    _MenuItemData(
+                      icon: Icons.receipt_long_rounded,
+                      title: "My bookings",
+                      subtitle: "View your tour history",
+                      onTap: () => _toast("Chưa làm My bookings"),
+                    ),
+                    _MenuItemData(
+                      icon: Icons.favorite_rounded,
+                      title: "Saved guides",
+                      subtitle: "Your favorite guides",
+                      onTap: () => _toast("Chưa làm Saved guides"),
+                    ),
+                  ],
+                ),
 
-          _MenuCard(
-            title: "Your stuff",
-            items: [
-              _MenuItemData(
-                icon: Icons.receipt_long_rounded,
-                title: "My bookings",
-                subtitle: "View your tour history",
-                onTap: () {
-                  // TODO: Navigator.push(...)
-                  _toast("Chưa làm My bookings");
-                },
-              ),
-              _MenuItemData(
-                icon: Icons.favorite_rounded,
-                title: "Saved guides",
-                subtitle: "Your favorite guides",
-                onTap: () => _toast("Chưa làm Saved guides"),
-              ),
-            ],
-          ),
+                const SizedBox(height: 14),
 
-          const SizedBox(height: 14),
-
-          _MenuCard(
-            title: "Account",
-            items: [
-              _MenuItemData(
-                icon: Icons.workspace_premium_rounded,
-                title: isGuide ? "Guide profile" : "Become a guide",
-                subtitle: isGuide ? "Manage your guide settings" : "Apply to be a guide",
-                onTap: () async {
-                  final user = FirebaseAuth.instance.currentUser;
-                  if (user == null) {
-                    _toast("Bạn chưa đăng nhập");
-                    return;
-                  }
-
-                  final changed = await Navigator.push<bool>(
-                    context,
-                    MaterialPageRoute(builder: (_) => const GuideRegisterPage()),
-                  );
-
-                  // nếu submit xong (Navigator.pop true) thì refresh lại isGuide từ Firestore stream (page đang listen sẵn)
-                  if (changed == true) {
-                    _toast("Đã cập nhật hồ sơ HDV");
-                  }
-                },
-
-              ),
-              _MenuItemData(
-                icon: Icons.settings_rounded,
-                title: "Settings",
-                subtitle: "Language, currency, privacy",
-                onTap: () => _toast("Chưa làm Settings"),
-              ),
-              _MenuItemData(
-                icon: Icons.logout_rounded,
-                title: "Log out",
-                subtitle: "Sign out of this account",
-                danger: true,
-                onTap: _confirmLogout,
-              ),
-            ],
-          ),
-        ],
-      ),
+                _MenuCard(
+                  title: "Account",
+                  items: [
+                    _MenuItemData(
+                      icon: Icons.workspace_premium_rounded,
+                      title: isGuide ? "Guide profile" : "Become a guide",
+                      subtitle: isGuide
+                          ? "Manage your guide settings"
+                          : "Apply to be a guide",
+                      onTap: () async {
+                        final changed = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const GuideRegisterPage(),
+                          ),
+                        );
+                        if (changed == true) {
+                          _toast("Đã cập nhật hồ sơ HDV");
+                        }
+                      },
+                    ),
+                    _MenuItemData(
+                      icon: Icons.settings_rounded,
+                      title: "Settings",
+                      subtitle: "Language, currency, privacy",
+                      onTap: () => _toast("Chưa làm Settings"),
+                    ),
+                    _MenuItemData(
+                      icon: Icons.logout_rounded,
+                      title: "Log out",
+                      subtitle: "Sign out of this account",
+                      danger: true,
+                      onTap: _confirmLogout,
+                    ),
+                  ],
+                ),
+              ],
+            ),
     );
   }
 
-bool saving = false;
+  Future<void> _saveProfileToFirestore(_EditResult result) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-Future<void> _saveProfileToFirestore(_EditResult result) async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return;
+    setState(() => _saving = true);
 
-  setState(() => _saving = true);
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        "fullName": result.fullName,
+        "phone": result.phone,
+        "cccd": result.cccd,
+        "address": result.address,
+        "email": user.email ?? "",
+        "updatedAt": FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
-  try {
-    final uid = user.uid;
+      if ((user.displayName ?? "") != result.fullName) {
+        await user.updateDisplayName(result.fullName);
+        await user.reload();
+      }
 
-    await FirebaseFirestore.instance.collection('users').doc(uid).set({
-      "fullName": result.fullName,
-      "phone": result.phone,
-      "cccd": result.cccd,
-      "address": result.address,
-      "email": user.email ?? "",
-      "updatedAt": FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    // cập nhật displayName để header đổi luôn (optional nhưng nên có)
-    if ((user.displayName ?? "") != result.fullName) {
-      await user.updateDisplayName(result.fullName);
-      await user.reload();
+      if (mounted) _toast("Saved!");
+    } catch (e) {
+      if (mounted) _toast("Save failed: $e");
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-
-    if (!mounted) return;
-    _toast("Saved to Firestore!");
-  } catch (e) {
-    if (!mounted) return;
-    _toast("Save failed: $e");
-  } finally {
-    if (mounted) setState(() => _saving = false);
   }
-}
-
 
   void _toast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
   }
 
   Future<void> _openEditProfile() async {
@@ -263,15 +264,13 @@ Future<void> _saveProfileToFirestore(_EditResult result) async {
     if (result == null) return;
 
     setState(() {
-    fullName = result.fullName;
-    phone = result.phone;
-    cccd = result.cccd;
-    address = result.address;
-  });
+      fullName = result.fullName;
+      phone = result.phone;
+      cccd = result.cccd;
+      address = result.address;
+    });
 
-  // ✅ lưu lên Firestore
-  await _saveProfileToFirestore(result);
-
+    await _saveProfileToFirestore(result);
   }
 
   Future<void> _confirmLogout() async {
@@ -281,25 +280,27 @@ Future<void> _saveProfileToFirestore(_EditResult result) async {
         title: const Text("Log out?"),
         content: const Text("You will need to sign in again."),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Cancel"),
+          ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
             child: const Text("Log out"),
           ),
         ],
       ),
     );
 
-    if (ok != true) return;
-
-    // TODO: FirebaseAuth.instance.signOut();
-    _toast("Logged out (demo)");
+    if (ok == true) {
+      // await FirebaseAuth.instance.signOut();
+      _toast("Logged out (demo)");
+    }
   }
-  
 }
 
-// ===== UI Components =====
+// ================= UI COMPONENTS =================
 
 class _HeaderCard extends StatelessWidget {
   final String name;
@@ -319,13 +320,17 @@ class _HeaderCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF67D4FF), Color(0xFF4C7DFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        gradient: LinearGradient(
+          colors: [kPrimary, kPrimary.withOpacity(0.85)],
         ),
         borderRadius: BorderRadius.circular(18),
-        boxShadow: const [BoxShadow(blurRadius: 18, color: Color(0x16000000), offset: Offset(0, 10))],
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 18,
+            color: Color(0x16000000),
+            offset: Offset(0, 10),
+          )
+        ],
       ),
       child: Row(
         children: [
@@ -336,32 +341,47 @@ class _HeaderCard extends StatelessWidget {
               color: Colors.white.withOpacity(0.25),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Icon(Icons.person_rounded, color: Colors.white, size: 32),
+            child: const Icon(Icons.person, color: Colors.white, size: 32),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(email, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+                Text(
+                  email,
+                  style: const TextStyle(color: Colors.white70),
+                ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFE066),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: Text(badge, style: const TextStyle(fontWeight: FontWeight.w900)),
+                  child: Text(
+                    badge,
+                    style: TextStyle(
+                      color: kPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
           IconButton(
             onPressed: onEdit,
-            icon: const Icon(Icons.edit_rounded, color: Colors.white),
-            tooltip: "Edit profile",
+            icon: const Icon(Icons.edit, color: Colors.white),
           ),
         ],
       ),
@@ -377,20 +397,18 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [BoxShadow(blurRadius: 18, color: Color(0x14000000), offset: Offset(0, 8))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-          const SizedBox(height: 10),
-          ...children,
-        ],
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            ...children,
+          ],
+        ),
       ),
     );
   }
@@ -401,21 +419,27 @@ class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
 
-  const _InfoRow({required this.icon, required this.label, required this.value});
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: const Color(0xFF4C7DFF)),
+        Icon(icon, color: kPrimary),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700, fontSize: 12)),
-              const SizedBox(height: 2),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 12, color: Colors.black54)),
+              Text(value,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
         ),
@@ -448,41 +472,40 @@ class _MenuCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [BoxShadow(blurRadius: 18, color: Color(0x14000000), offset: Offset(0, 8))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-          const SizedBox(height: 6),
-          ...items.map((it) => ListTile(
-                contentPadding: EdgeInsets.zero,
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            ...items.map(
+              (it) => ListTile(
                 onTap: it.onTap,
-                leading: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: it.danger ? const Color(0xFFFEE2E2) : const Color(0xFFEAF5FF),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(it.icon, color: it.danger ? const Color(0xFFEF4444) : const Color(0xFF4C7DFF)),
+                leading: Icon(
+                  it.icon,
+                  color: it.danger ? Colors.red : kPrimary,
                 ),
-                title: Text(it.title, style: TextStyle(fontWeight: FontWeight.w900, color: it.danger ? const Color(0xFFEF4444) : null)),
-                subtitle: Text(it.subtitle, style: const TextStyle(fontWeight: FontWeight.w700)),
-                trailing: const Icon(Icons.chevron_right_rounded),
-              )),
-        ],
+                title: Text(
+                  it.title,
+                  style: TextStyle(
+                    color: it.danger ? Colors.red : null,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: Text(it.subtitle),
+                trailing: const Icon(Icons.chevron_right),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// ===== Bottom sheet: edit =====
+// ================= EDIT SHEET =================
 
 class _EditResult {
   final String fullName;
@@ -515,7 +538,6 @@ class _EditProfileSheet extends StatefulWidget {
   State<_EditProfileSheet> createState() => _EditProfileSheetState();
 }
 
-
 class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _name;
   late final TextEditingController _phone;
@@ -544,28 +566,26 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + bottom),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text("Edit profile", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          const Text("Edit profile",
+              style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
-          _Field(label: "Full name", controller: _name, icon: Icons.person_rounded),
+          _Field(label: "Full name", controller: _name, icon: Icons.person),
           const SizedBox(height: 10),
-          _Field(label: "Phone", controller: _phone, icon: Icons.phone_rounded, keyboardType: TextInputType.phone),
+          _Field(label: "Phone", controller: _phone, icon: Icons.phone),
           const SizedBox(height: 10),
-          _Field(label: "CCCD", controller: _cccd, icon: Icons.badge_rounded, keyboardType: TextInputType.number),
+          _Field(label: "CCCD", controller: _cccd, icon: Icons.badge),
           const SizedBox(height: 10),
-          _Field(label: "Address", controller: _address, icon: Icons.location_on_rounded),
+          _Field(label: "Address", controller: _address, icon: Icons.location_on),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             height: 46,
-            child: ElevatedButton(  
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4C7DFF),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: kPrimary),
               onPressed: () {
                 Navigator.pop(
                   context,
@@ -577,7 +597,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   ),
                 );
               },
-              child: const Text("Save", style: TextStyle(fontWeight: FontWeight.w900)),
+              child: const Text(
+                "Save",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
@@ -590,24 +613,23 @@ class _Field extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final IconData icon;
-  final TextInputType? keyboardType;
 
   const _Field({
     required this.label,
     required this.controller,
     required this.icon,
-    this.keyboardType,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
-      keyboardType: keyboardType,
       decoration: InputDecoration(
-        prefixIcon: Icon(icon),
         labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+        prefixIcon: Icon(icon),
+        filled: true,
+        fillColor: Colors.white,
+        border: const OutlineInputBorder(),
       ),
     );
   }
