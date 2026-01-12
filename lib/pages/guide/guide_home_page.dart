@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:roamsg/pages/guide/guide_booking_history_page.dart';
+import 'package:roamsg/pages/guide/guide_upcoming_bookings_page.dart';
 
 class GuideHomePage extends StatefulWidget {
   const GuideHomePage({super.key});
@@ -18,26 +20,62 @@ class _GuideHomePageState extends State<GuideHomePage> {
   String _fmtDateTime(DateTime d) => DateFormat('HH:mm dd/MM').format(d);
   String _fmtMoney(int v) => NumberFormat.decimalPattern('vi').format(v);
 
-  Stream<List<BookingPreview>> recentGuideBookingsStream() {
+  DateTime _startOfToday() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  Stream<List<BookingPreview>> upcomingGuideBookingsStream() {
     final guideUid = FirebaseAuth.instance.currentUser!.uid;
+    final todayStart = Timestamp.fromDate(_startOfToday());
 
     return FirebaseFirestore.instance
         .collection('guide_bookings')
         .where('guideId', isEqualTo: guideUid)
-        .orderBy('createdAt', descending: true)
-        .limit(10)
+        .where('date', isGreaterThan: todayStart)
+        .orderBy('date')
+        .limit(3)
         .snapshots()
         .map((snap) {
           return snap.docs.map((doc) {
             final data = doc.data();
-            final bookedAt = (data['bookedAt'] as Timestamp).toDate();
+            final date = (data['date'] as Timestamp).toDate();
             final price = (data['price'] ?? 0) as int;
             final userId = (data['userId'] ?? '').toString();
 
             return BookingPreview(
-              "Guide booking",
+              doc.id,
+              "Upcoming",
               "User: ${userId.length > 6 ? userId.substring(0, 6) : userId} · Giá: ${_fmtMoney(price)}đ",
-              _fmtDateTime(bookedAt),
+              _fmtDateTime(date),
+            );
+          }).toList();
+        });
+  }
+
+  Stream<List<BookingPreview>> historyGuideBookingsStream() {
+    final guideUid = FirebaseAuth.instance.currentUser!.uid;
+    final todayStart = Timestamp.fromDate(_startOfToday());
+
+    return FirebaseFirestore.instance
+        .collection('guide_bookings')
+        .where('guideId', isEqualTo: guideUid)
+        .where('date', isLessThan: todayStart)
+        .orderBy('date', descending: true)
+        .limit(3)
+        .snapshots()
+        .map((snap) {
+          return snap.docs.map((doc) {
+            final data = doc.data();
+            final date = (data['date'] as Timestamp).toDate();
+            final price = (data['price'] ?? 0) as int;
+            final userId = (data['userId'] ?? '').toString();
+
+            return BookingPreview(
+              doc.id,
+              "Histoy",
+              "User: ${userId.length > 6 ? userId.substring(0, 6) : userId} · Giá: ${_fmtMoney(price)}đ",
+              _fmtDateTime(date),
             );
           }).toList();
         });
@@ -98,48 +136,27 @@ class _GuideHomePageState extends State<GuideHomePage> {
             children: [
               Row(
                 children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          elevation: 2,
-                        ),
-                        icon: Icon(Icons.map_outlined),
-                        label: Text("My tours"),
-                      ),
-                    ),
+                  Text(
+                    'Upcoming Bookings',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: SizedBox(
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Colors.black,
-                          elevation: 2,
+                  TextButton(
+                    onPressed: () {
+                      // Navigate to all bookings page
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const GuideUpcomingBookingsPage(),
                         ),
-                        icon: Icon(Icons.schedule_outlined),
-                        label: Text("Schedule"),
-                      ),
-                    ),
+                      );
+                    },
+                    child: Text('See all'),
                   ),
                 ],
               ),
-              SizedBox(height: 20),
-              Text(
-                "Recent Bookings",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
               SizedBox(height: 12),
-
               StreamBuilder<List<BookingPreview>>(
-                stream: recentGuideBookingsStream(),
+                stream: upcomingGuideBookingsStream(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(child: CircularProgressIndicator());
@@ -151,36 +168,49 @@ class _GuideHomePageState extends State<GuideHomePage> {
                   }
                   final bookings = snapshot.data ?? [];
                   if (bookings.isEmpty) {
-                    return Center(child: Text('No recent bookings'));
+                    return Center(child: Text('No upcoming bookings'));
                   }
-                  return Card(
-                    color: Colors.white,
-                    elevation: 2,
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        for (var booking in bookings) ...[
-                          ListTile(
-                            leading: Icon(Icons.event_note_outlined),
-                            title: Text(
-                              booking._title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Text(
-                              booking._subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.grey),
-                            ),
-                            trailing: Text(booking._time),
-                          ),
-                          Divider(height: 1),
-                        ],
-                      ],
-                    ),
-                  );
+                  return _buildBookingCard(context, bookings);
+                },
+              ),
+              Row(
+                children: [
+                  Text(
+                    'History Bookings',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      // Navigate to all bookings page
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const GuideHistoryBookingsPage(),
+                        ),
+                      );
+                    },
+                    child: Text('See all'),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12),
+
+              StreamBuilder<List<BookingPreview>>(
+                stream: upcomingGuideBookingsStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Lỗi tải bookings: ${snapshot.error}'),
+                    );
+                  }
+                  final bookings = snapshot.data ?? [];
+                  if (bookings.isEmpty) {
+                    return Center(child: Text('No history bookings'));
+                  }
+                  return _buildBookingCard(context, bookings);
                 },
               ),
             ],
@@ -192,9 +222,48 @@ class _GuideHomePageState extends State<GuideHomePage> {
 }
 
 class BookingPreview {
+  final String _id;
   final String _title;
   final String _subtitle;
   final String _time;
 
-  BookingPreview(this._title, this._subtitle, this._time);
+  BookingPreview(this._id, this._title, this._subtitle, this._time);
+}
+
+Widget _buildBookingCard(BuildContext context, List<BookingPreview> bookings) {
+  return Card(
+    color: Colors.white,
+    elevation: 2,
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      children: [
+        for (var booking in bookings) ...[
+          ListTile(
+            leading: Icon(Icons.event_note_outlined),
+            title: Text(
+              booking._title,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              booking._subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.grey),
+            ),
+            trailing: Text(booking._time),
+            onTap: () {
+              // Navigate to booking detail page
+              // Navigator.push(
+              //   context,
+              //   MaterialPageRoute(
+              //     builder: (_) => GuideBookingDetailPage(bookingId: booking._id),
+              //   ),
+              // );
+            },
+          ),
+          Divider(height: 1),
+        ],
+      ],
+    ),
+  );
 }
