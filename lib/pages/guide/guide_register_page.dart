@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-/// ====== Colors lấy từ RegisterPage ======
 const Color kBg = Color(0xFFF5F8FA);
 const Color kPrimary = Color(0xFF79D5FF);
 

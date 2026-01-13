@@ -1,9 +1,9 @@
 import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../guide/guide_register_page.dart';
+import 'package:roamsg/pages/profile/guide_profile_page.dart';
 import 'package:flutter/material.dart';
+
 
 
 const Color kBg = Color(0xFFF5F8FA);
@@ -157,12 +157,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       subtitle: "View your tour history",
                       onTap: () => _toast("Chưa làm My bookings"),
                     ),
-                    _MenuItemData(
-                      icon: Icons.favorite_rounded,
-                      title: "Saved guides",
-                      subtitle: "Your favorite guides",
-                      onTap: () => _toast("Chưa làm Saved guides"),
-                    ),
                   ],
                 ),
 
@@ -177,24 +171,24 @@ class _ProfilePageState extends State<ProfilePage> {
                       subtitle: isGuide
                           ? "Manage your guide settings"
                           : "Apply to be a guide",
-                      onTap: () async {
-                        final changed = await Navigator.push<bool>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const GuideRegisterPage(),
-                          ),
-                        );
-                        if (changed == true) {
-                          _toast("Đã cập nhật hồ sơ HDV");
-                        }
-                      },
+                    onTap: () async {
+                      final changed = await Navigator.push<bool>(
+                      context,
+                        MaterialPageRoute(
+                          builder: (_) => const GuideProfilePage(),
+                        ),
+                      );
+                      if (changed == true) {
+                      _toast("Đã cập nhật hồ sơ HDV");
+                      }
+                    },
                     ),
-                    _MenuItemData(
-                      icon: Icons.settings_rounded,
-                      title: "Settings",
-                      subtitle: "Language, currency, privacy",
-                      onTap: () => _toast("Chưa làm Settings"),
-                    ),
+                    // _MenuItemData(
+                    //   icon: Icons.settings_rounded,
+                    //   title: "Settings",
+                    //   subtitle: "Language, currency, privacy",
+                    //   onTap: () => _toast("Chưa làm Settings"),
+                    // ),
                     _MenuItemData(
                       icon: Icons.logout_rounded,
                       title: "Log out",
@@ -274,30 +268,46 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _confirmLogout() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Log out?"),
-        content: const Text("You will need to sign in again."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("Log out"),
-          ),
-        ],
-      ),
-    );
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text("Log out?"),
+      content: const Text("You will need to sign in again."),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text("Cancel"),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text("Log out"),
+        ),
+      ],
+    ),
+  );
 
-    if (ok == true) {
-      // await FirebaseAuth.instance.signOut();
-      _toast("Logged out (demo)");
-    }
+  if (ok != true) return;
+
+  try {
+    await _userSub?.cancel();
+    _userSub = null;
+
+    await FirebaseAuth.instance.signOut();
+
+    if (!mounted) return;
+
+    // ✅ Quay về root (AuthGate) và xóa các trang trên stack
+    Navigator.of(context).popUntil((route) => route.isFirst);
+
+    // (tuỳ chọn) thông báo
+    _toast("Logged out");
+  } catch (e) {
+    if (!mounted) return;
+    _toast("Log out failed: $e");
   }
+}
+
 }
 
 // ================= UI COMPONENTS =================

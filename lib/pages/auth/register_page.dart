@@ -10,7 +10,6 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  // ====== Colors lấy từ GuideHomePage ======
   static const Color kBg = Color(0xFFF5F8FA);
   static const Color kPrimary = Color(0xFF79D5FF);
 
