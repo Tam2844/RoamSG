@@ -56,323 +56,352 @@ class _GuideProfilePageState extends State<GuideProfilePage> {
     _LangItem(code: 'ko', name: 'Tiếng Hàn'),
   ];
 
-  Future<void> _openEditSheet({
-    required BuildContext context,
-    required bool hasGuide,
-    required Map<String, dynamic> data,
-    required DocumentReference<Map<String, dynamic>>? docRef,
-    required User authUser,
-  }) async {
-    final baseName = authUser.displayName ?? '';
-    final baseEmail = authUser.email ?? '';
+Future<void> _openEditSheet({
+  required BuildContext context,
+  required bool hasGuide,
+  required Map<String, dynamic> data,
+  required DocumentReference<Map<String, dynamic>>? docRef,
+  required User authUser,
+}) async {
+  final baseName = authUser.displayName ?? '';
+  final baseEmail = authUser.email ?? '';
 
-    // initial values
-    final fullNameCtrl = TextEditingController(text: (data['fullName'] ?? baseName).toString());
-    final phoneCtrl = TextEditingController(text: (data['phone'] ?? '').toString());
-    final bioCtrl = TextEditingController(text: (data['bio'] ?? '').toString());
+  // initial values
+  final fullNameCtrl = TextEditingController(text: (data['fullName'] ?? baseName).toString());
+  final phoneCtrl = TextEditingController(text: (data['phone'] ?? '').toString());
+  final bioCtrl = TextEditingController(text: (data['bio'] ?? '').toString());
+  final expCtrl = TextEditingController(text: (data['experienceYears'] ?? 0).toString());
+  final priceCtrl = TextEditingController(text: (data['pricePerHour'] ?? 0).toString());
 
-    final expCtrl = TextEditingController(text: (data['experienceYears'] ?? 0).toString());
-    final priceCtrl = TextEditingController(text: (data['pricePerHour'] ?? 0).toString());
+  bool isActive = (data['isActive'] ?? false) == true;
 
-    bool isActive = (data['isActive'] ?? false) == true;
+  final areas = _strList(data['areas']).toList();
+  final langSet = _strList(data['languages']).map((e) => e.toLowerCase().trim()).toSet();
 
-    final areas = _strList(data['areas']).toList();
-    final langSet = _strList(data['languages']).map((e) => e.toLowerCase().trim()).toSet();
+  final areaAddCtrl = TextEditingController();
+  final formKey = GlobalKey<FormState>();
 
-    final areaAddCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent, // quan trọng: để làm modal dạng "card"
+    barrierColor: Colors.black54,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          Future<void> save() async {
+            if (!formKey.currentState!.validate()) return;
 
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            Future<void> save() async {
-              if (!formKey.currentState!.validate()) return;
+            final fullName = fullNameCtrl.text.trim();
+            final phone = phoneCtrl.text.trim();
+            final bio = bioCtrl.text.trim();
 
-              final fullName = fullNameCtrl.text.trim();
-              final phone = phoneCtrl.text.trim();
-              final bio = bioCtrl.text.trim();
+            final experienceYears = _parseIntLoose(expCtrl.text);
+            final pricePerHour = _parseIntLoose(priceCtrl.text);
 
-              final experienceYears = _parseIntLoose(expCtrl.text);
-              final pricePerHour = _parseIntLoose(priceCtrl.text);
+            final payload = <String, dynamic>{
+              'userId': authUser.uid,
+              'fullName': fullName,
+              'email': baseEmail,
+              'phone': phone,
+              'bio': bio,
+              'experienceYears': experienceYears,
+              'pricePerHour': pricePerHour,
+              'isActive': isActive,
+              'areas': areas,
+              'languages': langSet.toList(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            };
 
-              final payload = <String, dynamic>{
-                'userId': authUser.uid,
-                'fullName': fullName,
-                'email': baseEmail,
-                'phone': phone,
-                'bio': bio,
-                'experienceYears': experienceYears,
-                'pricePerHour': pricePerHour,
-                'isActive': isActive,
-                'areas': areas,
-                'languages': langSet.toList(),
-                'updatedAt': FieldValue.serverTimestamp(),
-              };
+            try {
+              if (hasGuide && docRef != null) {
+                await docRef.update(payload);
+              } else {
+                payload['createdAt'] = FieldValue.serverTimestamp();
+                await FirebaseFirestore.instance.collection('guides').add(payload);
+              }
 
-              try {
-                // Update nếu đã có doc, còn không thì create doc mới
-                if (hasGuide && docRef != null) {
-                  await docRef.update(payload);
-                } else {
-                  payload['createdAt'] = FieldValue.serverTimestamp();
-                  await FirebaseFirestore.instance.collection('guides').add(payload);
-                }
-
-                if (mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Đã lưu hồ sơ Guide thành công.')),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Lưu thất bại: $e')),
-                  );
-                }
+              if (mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Đã lưu hồ sơ Guide thành công.')),
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Lưu thất bại: $e')),
+                );
               }
             }
+          }
 
-            return SafeArea(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  top: 14,
-                  bottom: 16 + MediaQuery.of(ctx).viewInsets.bottom,
-                ),
-                child: SingleChildScrollView(
-                  child: Form(
-                    key: formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                hasGuide ? 'Chỉnh sửa hồ sơ Guide' : 'Tạo hồ sơ Guide',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                              ),
+          final h = MediaQuery.of(ctx).size.height;
+          final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
+
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(14, 12, 14, 12 + bottomInset),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: 560,          // giống “Edit profile” của user (card giữa màn)
+                    maxHeight: h * 0.88,    // giới hạn chiều cao để scroll bên trong
+                  ),
+                  child: Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    clipBehavior: Clip.antiAlias,
+                    child: Form(
+                      key: formKey,
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 10),
+
+                          // drag handle (giống hình user)
+                          Container(
+                            width: 44,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: const Color(0x22000000),
+                              borderRadius: BorderRadius.circular(999),
                             ),
-                            IconButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              icon: const Icon(Icons.close),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Full name
-                        TextFormField(
-                          controller: fullNameCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Họ và tên',
-                            prefixIcon: Icon(Icons.person),
-                            border: OutlineInputBorder(),
                           ),
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Nhập họ và tên';
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 12),
+                          const SizedBox(height: 10),
 
-                        // Email (readonly)
-                        TextFormField(
-                          initialValue: baseEmail,
-                          readOnly: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Email (từ tài khoản)',
-                            prefixIcon: Icon(Icons.email),
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Phone
-                        TextFormField(
-                          controller: phoneCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Số điện thoại',
-                            prefixIcon: Icon(Icons.phone),
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Active switch
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFE6E6E6)),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.verified_rounded, color: kPrimary),
-                              const SizedBox(width: 10),
-                              const Expanded(
-                                child: Text('Trạng thái hoạt động', style: TextStyle(fontWeight: FontWeight.w600)),
-                              ),
-                              Switch(
-                                value: isActive,
-                                onChanged: (v) => setSheetState(() => isActive = v),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Experience + Price
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: expCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'Kinh nghiệm (năm)',
-                                  prefixIcon: Icon(Icons.work),
-                                  border: OutlineInputBorder(),
+                          // title + close
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Center(
+                                    child: Text(
+                                      hasGuide ? 'Chỉnh sửa hồ sơ Guide' : 'Tạo hồ sơ Guide',
+                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: TextFormField(
-                                controller: priceCtrl,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'Giá/giờ (VNĐ)',
-                                  prefixIcon: Icon(Icons.payments),
-                                  border: OutlineInputBorder(),
+                                IconButton(
+                                  onPressed: () => Navigator.pop(ctx),
+                                  icon: const Icon(Icons.close),
                                 ),
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Bio
-                        TextFormField(
-                          controller: bioCtrl,
-                          maxLines: 4,
-                          decoration: const InputDecoration(
-                            labelText: 'Giới thiệu (bio)',
-                            alignLabelWithHint: true,
-                            prefixIcon: Icon(Icons.subject),
-                            border: OutlineInputBorder(),
                           ),
-                        ),
-                        const SizedBox(height: 12),
+                          const Divider(height: 1),
 
-                        // Areas
-                        const Text('Khu vực (Areas)', style: TextStyle(fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: areaAddCtrl,
-                                decoration: const InputDecoration(
-                                  hintText: 'Ví dụ: HCM, HN, DN...',
-                                  border: OutlineInputBorder(),
-                                ),
+                          // body scroll
+                          Expanded(
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextFormField(
+                                    controller: fullNameCtrl,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Họ và tên',
+                                      prefixIcon: Icon(Icons.person),
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    validator: (v) {
+                                      if (v == null || v.trim().isEmpty) return 'Nhập họ và tên';
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  TextFormField(
+                                    initialValue: baseEmail,
+                                    readOnly: true,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Email (từ tài khoản)',
+                                      prefixIcon: Icon(Icons.email),
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  TextFormField(
+                                    controller: phoneCtrl,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Số điện thoại',
+                                      prefixIcon: Icon(Icons.phone),
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: const Color(0xFFE6E6E6)),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.verified_rounded, color: kPrimary),
+                                        const SizedBox(width: 10),
+                                        const Expanded(
+                                          child: Text(
+                                            'Trạng thái hoạt động',
+                                            style: TextStyle(fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                        Switch(
+                                          value: isActive,
+                                          onChanged: (v) => setSheetState(() => isActive = v),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: expCtrl,
+                                          keyboardType: TextInputType.number,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Kinh nghiệm (năm)',
+                                            prefixIcon: Icon(Icons.work),
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: priceCtrl,
+                                          keyboardType: TextInputType.number,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Giá/giờ (VNĐ)',
+                                            prefixIcon: Icon(Icons.payments),
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  TextFormField(
+                                    controller: bioCtrl,
+                                    maxLines: 4,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Giới thiệu (bio)',
+                                      alignLabelWithHint: true,
+                                      prefixIcon: Icon(Icons.subject),
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+
+                                  const Text('Khu vực (Areas)', style: TextStyle(fontWeight: FontWeight.w800)),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: areaAddCtrl,
+                                          decoration: const InputDecoration(
+                                            hintText: 'Ví dụ: HCM, HN, DN...',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      SizedBox(
+                                        height: 48,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(backgroundColor: kPrimary),
+                                          onPressed: () {
+                                            final v = areaAddCtrl.text.trim();
+                                            if (v.isEmpty) return;
+                                            if (!areas.contains(v)) {
+                                              setSheetState(() => areas.add(v));
+                                            }
+                                            areaAddCtrl.clear();
+                                          },
+                                          child: const Icon(Icons.add),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  if (areas.isEmpty)
+                                    const Text('Chưa chọn khu vực.', style: TextStyle(color: Colors.black54))
+                                  else
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: areas
+                                          .map((a) => InputChip(
+                                                label: Text(a),
+                                                onDeleted: () => setSheetState(() => areas.remove(a)),
+                                              ))
+                                          .toList(),
+                                    ),
+
+                                  const SizedBox(height: 14),
+                                  const Text('Ngôn ngữ (Languages)', style: TextStyle(fontWeight: FontWeight.w800)),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 10,
+                                    runSpacing: 10,
+                                    children: _langs.map((l) {
+                                      final selected = langSet.contains(l.code);
+                                      return FilterChip(
+                                        label: Text(l.name),
+                                        selected: selected,
+                                        onSelected: (v) {
+                                          setSheetState(() {
+                                            if (v) {
+                                              langSet.add(l.code);
+                                            } else {
+                                              langSet.remove(l.code);
+                                            }
+                                          });
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            SizedBox(
+                          ),
+
+                          // bottom save (luôn nằm dưới như hình user)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                            child: SizedBox(
+                              width: double.infinity,
                               height: 48,
                               child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(backgroundColor: kPrimary),
-                                onPressed: () {
-                                  final v = areaAddCtrl.text.trim();
-                                  if (v.isEmpty) return;
-                                  if (!areas.contains(v)) {
-                                    setSheetState(() => areas.add(v));
-                                  }
-                                  areaAddCtrl.clear();
-                                },
-                                child: const Icon(Icons.add),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: kPrimary,
+                                  shape: const StadiumBorder(),
+                                ),
+                                onPressed: save,
+                                child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        if (areas.isEmpty)
-                          const Text('Chưa chọn khu vực.', style: TextStyle(color: Colors.black54))
-                        else
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: areas
-                                .map(
-                                  (a) => InputChip(
-                                    label: Text(a),
-                                    onDeleted: () => setSheetState(() => areas.remove(a)),
-                                  ),
-                                )
-                                .toList(),
                           ),
-                        const SizedBox(height: 14),
-
-                        // Languages
-                        const Text('Ngôn ngữ (Languages)', style: TextStyle(fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: _langs.map((l) {
-                            final selected = langSet.contains(l.code);
-                            return FilterChip(
-                              label: Text(l.name),
-                              selected: selected,
-                              onSelected: (v) {
-                                setSheetState(() {
-                                  if (v) {
-                                    langSet.add(l.code);
-                                  } else {
-                                    langSet.remove(l.code);
-                                  }
-                                });
-                              },
-                            );
-                          }).toList(),
-                        ),
-
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(backgroundColor: kPrimary),
-                            onPressed: save,
-                            icon: const Icon(Icons.save),
-                            label: const Text(
-                              'Lưu thay đổi',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            );
-          },
-        );
-      },
-    );
-  }
+            ),
+          );
+        },
+      );
+    },
+  );
+}
 
   @override
   Widget build(BuildContext context) {
