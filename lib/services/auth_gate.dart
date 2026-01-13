@@ -26,7 +26,7 @@ class AuthGate extends StatelessWidget {
         if (user == null) return const LoginPage();
 
         // 3) Đã đăng nhập -> HomePage
-        return const HomePage();
+        return const UserHomePage();
       },
     );
   }
