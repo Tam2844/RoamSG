@@ -17,39 +17,61 @@ class GuideHistoryBookingsPage extends StatelessWidget {
   }
 
   Stream<List<BookingPreview>> _historyStream() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return Stream.value(const <BookingPreview>[]);
-    }
-
-    final uid = user.uid;
-    final today = Timestamp.fromDate(_startOfToday());
+    final guideUid = FirebaseAuth.instance.currentUser!.uid;
+    final todayStart = Timestamp.fromDate(_startOfToday());
 
     return FirebaseFirestore.instance
-        .collection('guide_bookings')
-        .where('guideId', isEqualTo: uid)
-        .where('date', isLessThan: today)
-        .orderBy('date', descending: true)
-        .limit(20)
+        .collection('tour_bookings')
+        .where('guideId', isEqualTo: guideUid)
+        .where('status', isEqualTo: 'accepted')
+        .where('endDate', isLessThan: todayStart)
+        .orderBy('endDate', descending: true)
+        .limit(3)
         .snapshots()
-        .map(
-          (snap) => snap.docs.map((doc) {
+        .map((snap) {
+          return snap.docs.map((doc) {
             final data = doc.data();
-            final date = (data['date'] as Timestamp).toDate();
-            final price = (data['price'] ?? 0) as int;
-            final userId = (data['userId'] ?? '').toString();
-            final shortUser = userId.length > 6
-                ? userId.substring(0, 6)
-                : userId;
+
+            final start = (data['startDate'] as Timestamp?)?.toDate();
+            final end = (data['endDate'] as Timestamp?)?.toDate();
+
+            final totalPrice = (data['totalPrice'] as num?)?.toInt() ?? 0;
+            final participants = (data['participants'] as num?)?.toInt() ?? 0;
+            final pickup = (data['pickupPoint'] ?? '-').toString();
+
+            final tourId = (data['tourId'] ?? '').toString();
+
+            final timeText = (start != null && end != null)
+                ? "${_fmtDateTime(start)} → ${_fmtDateTime(end)}"
+                : "-";
 
             return BookingPreview(
               doc.id,
-              "History",
-              "User: $shortUser · Giá: ${_fmtMoney(price)}đ",
-              _fmtDateTime(date),
+              tourId,
+              "$participants người · Đón: $pickup · ${_fmtMoney(totalPrice)}đ",
+              timeText,
             );
-          }).toList(),
-        );
+          }).toList();
+        });
+  }
+
+  Widget _tourTitleWidget(String tourId) {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance.collection('tours').doc(tourId).get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Text('Loading...');
+        }
+        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+          return Text(tourId);
+        }
+
+        final data = snapshot.data!.data() as Map<String, dynamic>;
+        final title = (data['title'] ?? tourId).toString();
+
+        return Text(title);
+      },
+    );
   }
 
   @override
@@ -61,6 +83,7 @@ class GuideHistoryBookingsPage extends StatelessWidget {
         backgroundColor: const Color(0xFF79D5FF),
         foregroundColor: Colors.white,
       ),
+
       body: StreamBuilder<List<BookingPreview>>(
         stream: _historyStream(),
         builder: (context, snapshot) {
@@ -81,18 +104,17 @@ class GuideHistoryBookingsPage extends StatelessWidget {
             itemBuilder: (context, index) {
               final booking = bookings[index];
               return ListTile(
-                title: Text(booking.title),
+                title: _tourTitleWidget(booking.tourid),
                 subtitle: Text(booking.subtitle),
                 trailing: Text(booking.dateTime),
                 onTap: () {
-                  // Navigator.push(
-                  //   context,
-                  //   MaterialPageRoute(
-                  //     builder: (_) => GuideDetailBookingsPage(
-                  //       bookingId: booking.id,
-                  //     ),
-                  //   ),
-                  // );
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          GuideDetailBookingsPage(bookingId: booking.id),
+                    ),
+                  );
                 },
               );
             },
@@ -105,9 +127,9 @@ class GuideHistoryBookingsPage extends StatelessWidget {
 
 class BookingPreview {
   final String id;
-  final String title;
+  final String tourid;
   final String subtitle;
   final String dateTime;
 
-  const BookingPreview(this.id, this.title, this.subtitle, this.dateTime);
+  const BookingPreview(this.id, this.tourid, this.subtitle, this.dateTime);
 }

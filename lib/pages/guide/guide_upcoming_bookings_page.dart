@@ -7,7 +7,6 @@ import 'package:roamsg/pages/guide/guide_detail_bookings_page.dart';
 
 class GuideUpcomingBookingsPage extends StatelessWidget {
   const GuideUpcomingBookingsPage({super.key});
-
   String _fmtDateTime(DateTime d) => DateFormat('HH:mm dd/MM').format(d);
   String _fmtMoney(int v) => NumberFormat.decimalPattern('vi').format(v);
 
@@ -16,42 +15,58 @@ class GuideUpcomingBookingsPage extends StatelessWidget {
     return DateTime(now.year, now.month, now.day);
   }
 
-  Stream<List<BookingPreview>> _upcomingStream() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      // chưa đăng nhập -> không crash
-      return Stream.value(const <BookingPreview>[]);
-    }
-
-    final uid = user.uid;
-    final today = Timestamp.fromDate(_startOfToday());
+  Stream<List<BookingPreview>> upcomingGuideBookingsStream() {
+    final guideUid = FirebaseAuth.instance.currentUser!.uid;
+    final todayStart = Timestamp.fromDate(_startOfToday());
 
     return FirebaseFirestore.instance
-        .collection('guide_bookings')
-        .where('guideId', isEqualTo: uid)
-        .where('date', isGreaterThanOrEqualTo: today)
-        .orderBy('date')
+        .collection('tour_bookings')
+        .where('guideId', isEqualTo: guideUid)
+        .where('status', isEqualTo: 'accepted')
+        .where('startDate', isGreaterThanOrEqualTo: todayStart)
+        .orderBy('startDate')
         .limit(10)
         .snapshots()
-        .map(
-          (snap) => snap.docs.map((doc) {
+        .map((snap) {
+          return snap.docs.map((doc) {
             final data = doc.data();
 
-            final date = (data['date'] as Timestamp).toDate();
-            final price = (data['price'] ?? 0) as int;
-            final userId = (data['userId'] ?? '').toString();
-            final shortUser = userId.length > 6
-                ? userId.substring(0, 6)
-                : userId;
+            final start = (data['startDate'] as Timestamp).toDate();
+            final end = (data['endDate'] as Timestamp).toDate();
+
+            final totalPrice = (data['totalPrice'] as num?)?.toInt() ?? 0;
+            final participants = (data['participants'] as num?)?.toInt() ?? 0;
+            final pickup = (data['pickupPoint'] ?? '-').toString();
+
+            final tourId = (data['tourId'] ?? '').toString();
 
             return BookingPreview(
               doc.id,
-              "Upcoming",
-              "User: $shortUser · Giá: ${_fmtMoney(price)}đ",
-              _fmtDateTime(date),
+              tourId,
+              "$participants người · Đón: $pickup · ${_fmtMoney(totalPrice)}đ",
+              "${_fmtDateTime(start)} → ${_fmtDateTime(end)}",
             );
-          }).toList(),
-        );
+          }).toList();
+        });
+  }
+
+  Widget _tourTitleWidget(String tourId) {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance.collection('tours').doc(tourId).get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Text('Loading...');
+        }
+        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+          return Text(tourId);
+        }
+
+        final data = snapshot.data!.data() as Map<String, dynamic>;
+        final title = (data['title'] ?? tourId).toString();
+
+        return Text(title);
+      },
+    );
   }
 
   @override
@@ -64,7 +79,7 @@ class GuideUpcomingBookingsPage extends StatelessWidget {
         foregroundColor: Colors.white,
       ),
       body: StreamBuilder<List<BookingPreview>>(
-        stream: _upcomingStream(),
+        stream: upcomingGuideBookingsStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -84,18 +99,17 @@ class GuideUpcomingBookingsPage extends StatelessWidget {
               final booking = bookings[index];
 
               return ListTile(
-                title: Text(booking.title),
+                title: _tourTitleWidget(booking.tourid),
                 subtitle: Text(booking.subtitle),
                 trailing: Text(booking.dateTime),
                 onTap: () {
-                  // Navigator.push(
-                  //   context,
-                  //   MaterialPageRoute(
-                  //     builder: (_) => GuideDetailBookingsPage(
-                  //       bookingId: booking.id, // ✅ đúng tên tham số
-                  //     ),
-                  //   ),
-                  // );
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          GuideDetailBookingsPage(bookingId: booking.id),
+                    ),
+                  );
                 },
               );
             },
@@ -108,9 +122,9 @@ class GuideUpcomingBookingsPage extends StatelessWidget {
 
 class BookingPreview {
   final String id;
-  final String title;
+  final String tourid;
   final String subtitle;
   final String dateTime;
 
-  const BookingPreview(this.id, this.title, this.subtitle, this.dateTime);
+  const BookingPreview(this.id, this.tourid, this.subtitle, this.dateTime);
 }

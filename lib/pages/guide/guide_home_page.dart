@@ -2,7 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:roamsg/pages/guide/guide_accept_booking_page.dart';
 import 'package:roamsg/pages/guide/guide_booking_history_page.dart';
+import 'package:roamsg/pages/guide/guide_create_tour_page.dart';
+import 'package:roamsg/pages/guide/guide_detail_bookings_page.dart';
 import 'package:roamsg/pages/guide/guide_upcoming_bookings_page.dart';
 
 class GuideHomePage extends StatefulWidget {
@@ -30,24 +33,32 @@ class _GuideHomePageState extends State<GuideHomePage> {
     final todayStart = Timestamp.fromDate(_startOfToday());
 
     return FirebaseFirestore.instance
-        .collection('guide_bookings')
+        .collection('tour_bookings')
         .where('guideId', isEqualTo: guideUid)
-        .where('date', isGreaterThan: todayStart)
-        .orderBy('date')
+        .where('status', isEqualTo: 'accepted')
+        .where('startDate', isGreaterThanOrEqualTo: todayStart)
+        .orderBy('startDate')
         .limit(3)
         .snapshots()
         .map((snap) {
           return snap.docs.map((doc) {
             final data = doc.data();
-            final date = (data['date'] as Timestamp).toDate();
-            final price = (data['price'] ?? 0) as int;
+
+            final start = (data['startDate'] as Timestamp).toDate();
+            final end = (data['endDate'] as Timestamp).toDate();
+
+            final totalPrice = (data['totalPrice'] as num?)?.toInt() ?? 0;
+            final participants = (data['participants'] as num?)?.toInt() ?? 0;
+            final pickup = (data['pickupPoint'] ?? '-').toString();
+
+            final tourId = (data['tourId'] ?? '').toString();
             final userId = (data['userId'] ?? '').toString();
 
             return BookingPreview(
               doc.id,
-              "Upcoming",
-              "User: ${userId.length > 6 ? userId.substring(0, 6) : userId} · Giá: ${_fmtMoney(price)}đ",
-              _fmtDateTime(date),
+              tourId,
+              "$participants người · Đón: $pickup · ${_fmtMoney(totalPrice)}đ",
+              "${_fmtDateTime(start)} → ${_fmtDateTime(end)}",
             );
           }).toList();
         });
@@ -58,27 +69,96 @@ class _GuideHomePageState extends State<GuideHomePage> {
     final todayStart = Timestamp.fromDate(_startOfToday());
 
     return FirebaseFirestore.instance
-        .collection('guide_bookings')
+        .collection('tour_bookings')
         .where('guideId', isEqualTo: guideUid)
-        .where('date', isLessThan: todayStart)
-        .orderBy('date', descending: true)
+        .where('status', isEqualTo: 'accepted')
+        .where('endDate', isLessThan: todayStart)
+        .orderBy('endDate', descending: true)
         .limit(3)
         .snapshots()
         .map((snap) {
           return snap.docs.map((doc) {
             final data = doc.data();
-            final date = (data['date'] as Timestamp).toDate();
-            final price = (data['price'] ?? 0) as int;
-            final userId = (data['userId'] ?? '').toString();
+
+            final start = (data['startDate'] as Timestamp?)?.toDate();
+            final end = (data['endDate'] as Timestamp?)?.toDate();
+
+            final totalPrice = (data['totalPrice'] as num?)?.toInt() ?? 0;
+            final participants = (data['participants'] as num?)?.toInt() ?? 0;
+            final pickup = (data['pickupPoint'] ?? '-').toString();
+
+            final tourId = (data['tourId'] ?? '').toString();
+
+            final timeText = (start != null && end != null)
+                ? "${_fmtDateTime(start)} → ${_fmtDateTime(end)}"
+                : "-";
 
             return BookingPreview(
               doc.id,
-              "Histoy",
-              "User: ${userId.length > 6 ? userId.substring(0, 6) : userId} · Giá: ${_fmtMoney(price)}đ",
-              _fmtDateTime(date),
+              tourId,
+              "$participants người · Đón: $pickup · ${_fmtMoney(totalPrice)}đ",
+              timeText,
             );
           }).toList();
         });
+  }
+
+  Widget _tourTitleWidget(String tourId) {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance.collection('tours').doc(tourId).get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Text('Loading...');
+        }
+        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+          return Text(tourId);
+        }
+
+        final data = snapshot.data!.data() as Map<String, dynamic>;
+        final title = (data['title'] ?? tourId).toString();
+
+        return Text(title);
+      },
+    );
+  }
+
+  Widget _buildBookingCard(
+    BuildContext context,
+    List<BookingPreview> bookings,
+  ) {
+    return Card(
+      color: Colors.white,
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var booking in bookings) ...[
+            ListTile(
+              leading: Icon(Icons.event_note_outlined),
+              title: _tourTitleWidget(booking.tourid),
+              subtitle: Text(
+                booking.subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.grey),
+              ),
+              trailing: Text(booking.time),
+              onTap: () {
+                // Navigate to booking detail page
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        GuideDetailBookingsPage(bookingId: booking.id),
+                  ),
+                );
+              },
+            ),
+            Divider(height: 1),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -129,6 +209,21 @@ class _GuideHomePageState extends State<GuideHomePage> {
           ),
         ],
       ),
+
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const GuideCreateTourPage()),
+          );
+        },
+        label: const Text("Tạo tour"),
+        backgroundColor: const Color(0xFF79D5FF),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
+
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -142,7 +237,7 @@ class _GuideHomePageState extends State<GuideHomePage> {
                   ),
                   TextButton(
                     onPressed: () {
-                      // Navigate to all bookings page
+                      //Navigate to all bookings page
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -173,6 +268,28 @@ class _GuideHomePageState extends State<GuideHomePage> {
                   return _buildBookingCard(context, bookings);
                 },
               ),
+              SizedBox(height: 24),
+              Row(
+                children: [
+                  Text(
+                    'Pending Bookings',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const GuideAcceptBookingPage(),
+                        ),
+                      );
+                    },
+                    child: Text('See all'),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12),
+
               Row(
                 children: [
                   Text(
@@ -196,7 +313,7 @@ class _GuideHomePageState extends State<GuideHomePage> {
               SizedBox(height: 12),
 
               StreamBuilder<List<BookingPreview>>(
-                stream: upcomingGuideBookingsStream(),
+                stream: historyGuideBookingsStream(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(child: CircularProgressIndicator());
@@ -222,48 +339,9 @@ class _GuideHomePageState extends State<GuideHomePage> {
 }
 
 class BookingPreview {
-  final String _id;
-  final String _title;
-  final String _subtitle;
-  final String _time;
-
-  BookingPreview(this._id, this._title, this._subtitle, this._time);
-}
-
-Widget _buildBookingCard(BuildContext context, List<BookingPreview> bookings) {
-  return Card(
-    color: Colors.white,
-    elevation: 2,
-    clipBehavior: Clip.antiAlias,
-    child: Column(
-      children: [
-        for (var booking in bookings) ...[
-          ListTile(
-            leading: Icon(Icons.event_note_outlined),
-            title: Text(
-              booking._title,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(
-              booking._subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.grey),
-            ),
-            trailing: Text(booking._time),
-            onTap: () {
-              // Navigate to booking detail page
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //     builder: (_) => GuideBookingDetailPage(bookingId: booking._id),
-              //   ),
-              // );
-            },
-          ),
-          Divider(height: 1),
-        ],
-      ],
-    ),
-  );
+  final String id;
+  final String tourid;
+  final String subtitle;
+  final String time;
+  BookingPreview(this.id, this.tourid, this.subtitle, this.time);
 }
